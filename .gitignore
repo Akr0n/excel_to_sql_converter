@@ -15,7 +15,7 @@ target/
 
 #paths
 build/*
-dest/*
+dist/*
 
 #other
 *.log
