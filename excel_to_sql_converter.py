@@ -46,8 +46,8 @@ def convert_file(file_path, db_type, schema, table, database=None):
             # Aggiungi USE solo per SQL Server se specificato
             if db_type == "sqlserver" and database:
                 f.write(f"USE {database}\nGO\n\n")
-            # DELETE FROM prima delle INSERT
-            f.write(f"DELETE FROM {schema}.{table};\n\n")
+            # DELETE FROM prima delle INSERT, subito seguito dal GO
+            f.write(f"DELETE FROM {schema}.{table};\nGO\n\n")
             f.write(sql_insert)
         logging.info(f"Conversione OK. File SQL generato: {out_file}")
         return f"File SQL generato: {out_file}"
