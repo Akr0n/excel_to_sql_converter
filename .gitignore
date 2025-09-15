@@ -20,3 +20,4 @@ dist/*
 #other
 *.log
 *.spec
+*.sql
