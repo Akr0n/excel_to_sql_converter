@@ -20,7 +20,7 @@ def format_insert(db_type, schema, table, df):
             if pd.isnull(val):
                 values.append("NULL")
             else:
-                values.append(f"'{str(val).replace(\"'\", \"''\")}'"
+                values.append(f"'{str(val).replace("\"'\", \"''\")}'"
         cols = ", ".join([f'"{col}"' for col in columns]) if db_type == 'postgres' else ", ".join(columns)
         vals = ", ".join(values)
         statement = f'INSERT INTO {schema}.{table} ({cols}) VALUES ({vals});'
