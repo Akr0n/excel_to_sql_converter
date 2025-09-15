@@ -9,11 +9,10 @@ logger = None
 
 def setup_logging(file_path):
     global logger
-    # Nome log: filename + _log + .log
-    base = os.path.splitext(file_path)
-    log_file = f"{base}_log.log"
+    base = os.path.splitext(os.path.basename(file_path))[0]
+    dir_path = os.path.dirname(file_path)
+    log_file = os.path.join(dir_path, f"{base}_log.log")
     logger = logging.getLogger()
-    # Rimuovi eventuali handler precedenti per gestioni multiple
     if logger.hasHandlers():
         logger.handlers.clear()
     logging.basicConfig(
@@ -54,7 +53,10 @@ def convert_file(file_path, db_type, schema, table, database=None):
         return f"Errore caricamento dati: {e}"
     try:
         sql_insert = format_insert(db_type, schema, table, df)
-        out_file = "output_inserts.sql"
+        # Salva il file SQL con lo stesso nome base del file di origine
+        base = os.path.splitext(os.path.basename(file_path))[0]
+        dir_path = os.path.dirname(file_path)
+        out_file = os.path.join(dir_path, f"{base}.sql")
         with open(out_file, "w", encoding="utf-8") as f:
             if db_type == "sqlserver" and database:
                 f.write(f"USE {database}\nGO\n\n")
