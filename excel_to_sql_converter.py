@@ -40,12 +40,15 @@ def convert_file(file_path, db_type, schema, table, database=None):
         logging.error(f"Errore caricando i dati: {e}")
         return f"Errore caricamento dati: {e}"
     try:
-        sql = format_insert(db_type, schema, table, df)
+        sql_insert = format_insert(db_type, schema, table, df)
         out_file = "output_inserts.sql"
         with open(out_file, "w", encoding="utf-8") as f:
+            # Aggiungi USE solo per SQL Server se specificato
             if db_type == "sqlserver" and database:
                 f.write(f"USE {database}\nGO\n\n")
-            f.write(sql)
+            # DELETE FROM prima delle INSERT
+            f.write(f"DELETE FROM {schema}.{table};\n\n")
+            f.write(sql_insert)
         logging.info(f"Conversione OK. File SQL generato: {out_file}")
         return f"File SQL generato: {out_file}"
     except Exception as e:
@@ -91,14 +94,12 @@ file_entry.grid(row=0, column=1)
 browse_btn = tk.Button(root, text="Sfoglia", command=browse_file)
 browse_btn.grid(row=0, column=2)
 
-tk.Label(root, text="Database:").grid_forget()
-tk.Label(root, text="Schema:").grid(row=2, column=0, sticky='e')
-
+tk.Label(root, text="Tipo Database:").grid(row=1, column=0, sticky='e')
 db_combobox = ttk.Combobox(root, values=["Postgres", "SQLServer", "Oracle"], state="readonly")
 db_combobox.grid(row=1, column=1, columnspan=2, sticky='w')
 db_combobox.current(0)
-tk.Label(root, text="Tipo Database:").grid(row=1, column=0, sticky='e')
 
+tk.Label(root, text="Schema:").grid(row=2, column=0, sticky='e')
 schema_entry = tk.Entry(root, width=20)
 schema_entry.grid(row=2, column=1, columnspan=2, sticky='w')
 
@@ -108,7 +109,7 @@ table_entry.grid(row=3, column=1, columnspan=2, sticky='w')
 
 db_label = tk.Label(root, text="Database:")
 db_entry = tk.Entry(root, width=20)
-# all'avvio il campo è nascosto
+# campo nascosto fino alla selezione
 
 convert_btn = tk.Button(root, text="Converti", command=start_conversion)
 convert_btn.grid(row=5, column=1, pady=8)
