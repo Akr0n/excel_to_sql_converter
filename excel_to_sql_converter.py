@@ -4,12 +4,25 @@ import logging
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 
-# Configura logging
-logging.basicConfig(
-    filename='conversion.log',
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+# Variabile globale per gestire il logging dinamico
+logger = None
+
+def setup_logging(file_path):
+    global logger
+    # Nome log: filename + _log + .log
+    base = os.path.splitext(file_path)
+    log_file = f"{base}_log.log"
+    logger = logging.getLogger()
+    # Rimuovi eventuali handler precedenti per gestioni multiple
+    if logger.hasHandlers():
+        logger.handlers.clear()
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s'
+    )
+    logger.info(f"File di log creato: {log_file}")
+    return log_file
 
 def format_insert(db_type, schema, table, df):
     statements = []
@@ -43,10 +56,8 @@ def convert_file(file_path, db_type, schema, table, database=None):
         sql_insert = format_insert(db_type, schema, table, df)
         out_file = "output_inserts.sql"
         with open(out_file, "w", encoding="utf-8") as f:
-            # Aggiungi USE solo per SQL Server se specificato
             if db_type == "sqlserver" and database:
                 f.write(f"USE {database}\nGO\n\n")
-            # DELETE FROM prima delle INSERT, subito seguito dal GO
             f.write(f"DELETE FROM {schema}.{table};\nGO\n\n")
             f.write(sql_insert)
         logging.info(f"Conversione OK. File SQL generato: {out_file}")
@@ -62,6 +73,8 @@ def browse_file():
     ])
     file_entry.delete(0, tk.END)
     file_entry.insert(0, file_path)
+    # Setup dinamico del file di log
+    setup_logging(file_path)
 
 def on_db_change(event):
     db_type = db_combobox.get().lower()
