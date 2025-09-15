@@ -28,6 +28,15 @@ def format_insert(db_type, schema, table, df):
     logging.info(f"Generati {len(statements)} statements INSERT")
     return "\n".join(statements)
 
+def on_db_change(event):
+    db_type = db_combobox.get().lower()
+    if db_type == "sqlserver":
+        db_label.grid(row=4, column=0, sticky='e')
+        db_entry.grid(row=4, column=1, columnspan=2, sticky='w')
+    else:
+        db_label.grid_remove()
+        db_entry.grid_remove()
+
 def convert_file(file_path, db_type, schema, table):
     ext = os.path.splitext(file_path)[1].lower()
     try:
@@ -58,21 +67,24 @@ def browse_file():
     file_entry.delete(0, tk.END)
     file_entry.insert(0, file_path)
 
+# Avvia conversione
 def start_conversion():
     file_path = file_entry.get()
     db_type = db_combobox.get().lower()
     schema = schema_entry.get()
     table = table_entry.get()
+    database = db_entry.get() if db_type == "sqlserver" else None
     if not file_path or not db_type or not schema or not table:
         messagebox.showwarning("Attenzione", "Completa tutti i campi!")
         return
-    result = convert_file(file_path, db_type, schema, table)
+    result = convert_file(file_path, db_type, schema, table, database)
     messagebox.showinfo("Risultato", result)
 
 # Crea GUI
 root = tk.Tk()
 root.title("Excel to SQL Converter")
 
+# Etichette e campi
 tk.Label(root, text="File Excel:").grid(row=0, column=0, sticky='e')
 file_entry = tk.Entry(root, width=40)
 file_entry.grid(row=0, column=1)
@@ -82,7 +94,11 @@ browse_btn.grid(row=0, column=2)
 tk.Label(root, text="Database:").grid(row=1, column=0, sticky='e')
 db_combobox = ttk.Combobox(root, values=["Postgres", "SQLServer", "Oracle"], state="readonly")
 db_combobox.grid(row=1, column=1, columnspan=2, sticky='w')
+db_combobox.bind("<<ComboboxSelected>>", on_db_change)
 db_combobox.current(0)
+
+db_label = tk.Label(root, text="Database:")
+db_entry = tk.Entry(root, width=20)
 
 tk.Label(root, text="Schema:").grid(row=2, column=0, sticky='e')
 schema_entry = tk.Entry(root, width=20)
@@ -93,6 +109,6 @@ table_entry = tk.Entry(root, width=20)
 table_entry.grid(row=3, column=1, columnspan=2, sticky='w')
 
 convert_btn = tk.Button(root, text="Converti", command=start_conversion)
-convert_btn.grid(row=4, column=1, pady=8)
+convert_btn.grid(row=5, column=1, pady=8)
 
 root.mainloop()
