@@ -1,0 +1,17 @@
+# Eclipse
+.classpath
+.project
+.settings/
+
+# Maven
+log/
+target/
+.mvn
+
+#compressed
+*.zip
+#*.bin
+#*.war
+
+#other
+*.log
