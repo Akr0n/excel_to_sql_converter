@@ -50,8 +50,8 @@ def convert_file(file_path, db_type, schema, table, database=None):
             df = pd.read_excel(file_path)
         logging.info(f"Dati caricati correttamente da {file_path}")
     except Exception as e:
-        logging.error(f"Errore caricando i dati: {e}")
-        return f"{os.path.basename(file_path)} -> Errore caricamento dati: {e}"
+        logging.error(f"Errore nel caricamento dati: {e}")
+        return f"{os.path.basename(file_path)} -> Errore nel caricamento dati: {e}"
     try:
         sql_insert = format_insert(db_type, schema, table, df)
         base = os.path.splitext(os.path.basename(file_path))[0]
@@ -62,7 +62,7 @@ def convert_file(file_path, db_type, schema, table, database=None):
                 f.write(f"USE {database}\nGO\n\n")
             f.write(f"DELETE FROM {schema}.{table};\nGO\n\n")
             f.write(sql_insert)
-        logging.info(f"Conversione OK. File SQL generato: {out_file}")
+        logging.info(f"Conversione terminata correttamente. File SQL generato: {out_file}")
         return f"{os.path.basename(file_path)} -> OK (Generato: {out_file})"
     except Exception as e:
         logging.error(f"Errore conversione: {e}")
@@ -107,7 +107,7 @@ def start_conversion():
 root = tk.Tk()
 root.title("Excel to SQL Converter")
 
-tk.Label(root, text="File Excel (multi):").grid(row=0, column=0, sticky='e')
+tk.Label(root, text="File Excel:").grid(row=0, column=0, sticky='e')
 file_entry = tk.Entry(root, width=65)
 file_entry.grid(row=0, column=1)
 browse_btn = tk.Button(root, text="Sfoglia", command=browse_files)
