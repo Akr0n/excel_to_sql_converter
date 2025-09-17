@@ -7,12 +7,11 @@ from tkinter import filedialog, ttk, messagebox
 logger = None
 
 def setup_logging(file_path):
-    global logger
     base = os.path.splitext(os.path.basename(file_path))[0]
     dir_path = os.path.dirname(file_path)
     log_file = os.path.join(dir_path, f"{base}_log.log")
+    global logger
     logger = logging.getLogger()
-    # Gestione logging multiplo (reset handler)
     if logger.hasHandlers():
         logger.handlers.clear()
     logging.basicConfig(
@@ -35,8 +34,7 @@ def format_insert(db_type, schema, table, df):
                 values.append(f"'{str(val).replace("'", "''")}'")
         cols = ", ".join([f'"{col}"' for col in columns]) if db_type == 'postgres' else ", ".join(columns)
         vals = ", ".join(values)
-        statement = f'INSERT INTO {schema}.{table} ({cols}) VALUES ({vals});'
-        statements.append(statement)
+        statements.append(f'INSERT INTO {schema}.{table} ({cols}) VALUES ({vals});')
     logging.info(f"Generati {len(statements)} statements INSERT")
     return "\n".join(statements)
 
@@ -69,25 +67,27 @@ def convert_file(file_path, db_type, schema, table, database=None):
         return f"{os.path.basename(file_path)} -> Errore conversione: {e}"
 
 def browse_files():
-    files = filedialog.askopenfilenames(filetypes=[
-        ("Excel files", "*.xlsx;*.xls;*.csv"),
-        ("All files", "*.*")
-    ])
-    # Mostra nella field (solo per info visuale) i nomi selezionati separati da ;
-    file_entry.delete(0, tk.END)
-    file_entry.insert(0, "; ".join(files))
+    files = filedialog.askopenfilenames(
+        filetypes=[
+            ("Excel files", "*.xlsx;*.xls;*.csv"),
+            ("All files", "*.*")
+        ]
+    )
+    files_listbox.delete(0, tk.END)
+    for f in files:
+        files_listbox.insert(tk.END, f)
 
 def on_db_change(event):
     db_type = db_combobox.get().lower()
     if db_type == "sqlserver":
-        db_label.grid(row=4, column=0, sticky='e')
-        db_entry.grid(row=4, column=1, columnspan=2, sticky='w')
+        db_label.grid(row=2, column=7, sticky='e', padx=2, pady=5)
+        db_entry.grid(row=2, column=8, sticky='ew', padx=(0,15), pady=5)
     else:
         db_label.grid_remove()
         db_entry.grid_remove()
 
 def start_conversion():
-    files = file_entry.get().split("; ")
+    files = [files_listbox.get(i) for i in range(files_listbox.size())]
     db_type = db_combobox.get().lower()
     schema = schema_entry.get()
     table = table_entry.get()
@@ -103,36 +103,51 @@ def start_conversion():
         reports.append(convert_file(file_path, db_type, schema, table, database))
     messagebox.showinfo("Risultato Conversioni", "\n".join(reports))
 
-# Crea GUI
+# Costruzione GUI
 root = tk.Tk()
 root.title("Excel to SQL Converter")
 
-tk.Label(root, text="File Excel:").grid(row=0, column=0, sticky='e')
-file_entry = tk.Entry(root, width=65)
-file_entry.grid(row=0, column=1)
-browse_btn = tk.Button(root, text="Sfoglia", command=browse_files)
-browse_btn.grid(row=0, column=2)
+# Grid configuration for padding/espansione
+for i in range(0, 9):
+    root.grid_columnconfigure(i, weight=1, minsize=20)
 
-tk.Label(root, text="Tipo Database:").grid(row=1, column=0, sticky='e')
-db_combobox = ttk.Combobox(root, values=["Postgres", "SQLServer", "Oracle"], state="readonly")
-db_combobox.grid(row=1, column=1, columnspan=2, sticky='w')
+# Selezione file
+tk.Label(root, text="File Excel (multi):").grid(row=0, column=0, columnspan=2, sticky="e", pady=(10,5), padx=(10,3))
+files_listbox = tk.Listbox(root, width=70, height=4, selectmode=tk.EXTENDED)
+files_listbox.grid(row=0, column=2, columnspan=5, sticky='ew', pady=(10,5), padx=(0,5))
+browse_btn = tk.Button(root, text="Sfoglia", command=browse_files)
+browse_btn.grid(row=0, column=7, columnspan=2, padx=(3,10), pady=(10,5), sticky='w')
+
+# Riga parametri in linea, tutti sufficientemente larghi
+tk.Label(root, text="Tipo Database:").grid(row=2, column=0, sticky='e', padx=(10,2), pady=7)
+db_combobox = ttk.Combobox(root, values=["Postgres", "SQLServer", "Oracle"], state="readonly", width=12)
+db_combobox.grid(row=2, column=1, sticky='ew', padx=(0,8), pady=7)
 db_combobox.current(0)
 
-tk.Label(root, text="Schema:").grid(row=2, column=0, sticky='e')
-schema_entry = tk.Entry(root, width=20)
-schema_entry.grid(row=2, column=1, columnspan=2, sticky='w')
+tk.Label(root, text="Schema:").grid(row=2, column=2, sticky='e', padx=(8,2), pady=7)
+schema_entry = tk.Entry(root, width=18)
+schema_entry.grid(row=2, column=3, sticky='ew', padx=(0,8), pady=7)
 
-tk.Label(root, text="Tabella:").grid(row=3, column=0, sticky='e')
-table_entry = tk.Entry(root, width=20)
-table_entry.grid(row=3, column=1, columnspan=2, sticky='w')
+tk.Label(root, text="Tabella:").grid(row=2, column=4, sticky='e', padx=(8,2), pady=7)
+table_entry = tk.Entry(root, width=18)
+table_entry.grid(row=2, column=5, sticky='ew', padx=(0,8), pady=7)
 
 db_label = tk.Label(root, text="Database:")
-db_entry = tk.Entry(root, width=20)
-# campo nascosto fino alla selezione
+db_entry = tk.Entry(root, width=18)
 
+# Bottone converti centrato, largo sull'intera griglia
 convert_btn = tk.Button(root, text="Converti", command=start_conversion)
-convert_btn.grid(row=5, column=1, pady=8)
+convert_btn.grid(row=3, column=0, columnspan=9, pady=(18,16), sticky='n')
 
 db_combobox.bind("<<ComboboxSelected>>", on_db_change)
+
+# Centra la finestra al lancio di default (facoltativo, puoi togliere se non ti serve)
+root.update_idletasks()
+w = root.winfo_screenwidth()
+h = root.winfo_screenheight()
+size = tuple(int(_) for _ in root.geometry().split('+')[0].split('x'))
+x = w//2 - size[0]//2
+y = h//2 - size[1]//2
+root.geometry(f"{size[0]}x{size[1]}+{x}+{y}")
 
 root.mainloop()
