@@ -74,12 +74,12 @@ class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Excel to SQL Converter")
-        self.geometry("665x260")
+        self.geometry("430x420")
         self.resizable(False, False)
         self.db_type = None
         self.icon_images = {}
-        self.create_db_selection()
-        # Precarica le icone dalla cartella 'images'
+        self.arrow_icon = None
+        # Carica icone database
         for dbname, filename in [
             ('oracle', 'oracle.png'),
             ('postgres', 'postgres.png'),
@@ -87,113 +87,141 @@ class MainApp(tk.Tk):
         ]:
             try:
                 path_icon = os.path.join(IMAGES_PATH, filename)
-                img = Image.open(path_icon).resize(ICON_SIZE, Image.ANTIALIAS)
+                img = Image.open(path_icon).resize(ICON_SIZE, Image.LANCZOS)
                 self.icon_images[dbname] = ImageTk.PhotoImage(img)
             except Exception as e:
                 self.icon_images[dbname] = None
-
-    def create_db_selection(self):
-        self.clean_widgets()
-        title = tk.Label(self, text="Scegli il database di destinazione:", font=("Segoe UI", 12, 'bold'))
-        title.pack(pady=24)
-        frame = tk.Frame(self)
-        frame.pack()
-
-        btn_oracle = tk.Button(
-            frame,
-            text=" Oracle",
-            font=("Segoe UI", 11, 'bold'),
-            compound="left",
-            image=self.icon_images.get('oracle'),
-            width=140,
-            anchor='w',
-            command=lambda: self.show_main_form("oracle")
-        )
-        btn_oracle.grid(row=0, column=0, padx=16)
-        btn_postgres = tk.Button(
-            frame,
-            text=" Postgres",
-            font=("Segoe UI", 11, 'bold'),
-            compound="left",
-            image=self.icon_images.get('postgres'),
-            width=140,
-            anchor='w',
-            command=lambda: self.show_main_form("postgres")
-        )
-        btn_postgres.grid(row=0, column=1, padx=16)
-        btn_sqlserver = tk.Button(
-            frame,
-            text=" SQL Server",
-            font=("Segoe UI", 11, 'bold'),
-            compound="left",
-            image=self.icon_images.get('sqlserver'),
-            width=160,
-            anchor='w',
-            command=lambda: self.show_main_form("sqlserver")
-        )
-        btn_sqlserver.grid(row=0, column=2, padx=16)
+        # Carica icona Indietro
+        try:
+            arrow_path = os.path.join(IMAGES_PATH, "barrow.png")
+            arrow_img = Image.open(arrow_path).resize(ICON_SIZE, Image.LANCZOS)
+            self.arrow_icon = ImageTk.PhotoImage(arrow_img)
+        except Exception as e:
+            self.arrow_icon = None
+        self.show_db_menu()
 
     def clean_widgets(self):
         for widget in self.winfo_children():
             widget.destroy()
 
+    def show_db_menu(self):
+        self.clean_widgets()
+        title = tk.Label(self, text="Scegli il database di destinazione:", font=("Segoe UI", 12, 'bold'))
+        title.pack(pady=18)
+        frame = tk.Frame(self)
+        frame.pack(pady=8)
+        # Oracle - primo (in alto)
+        btn_oracle = tk.Button(
+            frame,
+            text=" Oracle",
+            font=("Segoe UI", 12, 'bold'),
+            compound="left",
+            image=self.icon_images.get('oracle'),
+            width=165,
+            anchor='w',
+            command=lambda: self.show_main_form("oracle")
+        )
+        btn_oracle.grid(row=0, column=0, pady=7)
+        # Postgres - secondo
+        btn_postgres = tk.Button(
+            frame,
+            text=" Postgres",
+            font=("Segoe UI", 12, 'bold'),
+            compound="left",
+            image=self.icon_images.get('postgres'),
+            width=165,
+            anchor='w',
+            command=lambda: self.show_main_form("postgres")
+        )
+        btn_postgres.grid(row=1, column=0, pady=7)
+        # SQL Server - terzo (in basso)
+        btn_sqlserver = tk.Button(
+            frame,
+            text=" SQL Server",
+            font=("Segoe UI", 12, 'bold'),
+            compound="left",
+            image=self.icon_images.get('sqlserver'),
+            width=165,
+            anchor='w',
+            command=lambda: self.show_main_form("sqlserver")
+        )
+        btn_sqlserver.grid(row=2, column=0, pady=7)
+
     def show_main_form(self, db_type):
         self.db_type = db_type
         self.clean_widgets()
-        file_label = tk.Label(self, text="File Excel (multi):", font=("Segoe UI", 10))
-        file_label.grid(row=0, column=0, sticky="e", padx=(16,2), pady=(16,5))
-        self.files_listbox = tk.Listbox(self, width=60, height=4, selectmode=tk.EXTENDED)
-        self.files_listbox.grid(row=0, column=1, columnspan=3, sticky='ew', padx=(0,5), pady=(16,5))
-        browse_btn = tk.Button(self, text="Sfoglia", width=10, command=self.browse_files)
-        browse_btn.grid(row=0, column=4, padx=(2,16), pady=(16,5))
+        # bottone "Indietro" (in alto a sinistra)
+        back_frame = tk.Frame(self)
+        back_frame.grid(row=0, column=0, columnspan=2, sticky="nw", padx=(14,0), pady=(14,0))
+        back_btn = tk.Button(
+            back_frame,
+            text=" Indietro",
+            font=("Segoe UI", 10),
+            width=90,
+            height=36,
+            image=self.arrow_icon,
+            compound="left",      # icona a sinistra, testo a destra
+            padx=12,              # padding orizzontale interno
+            anchor="center",
+            command=self.show_db_menu
+        )
+        back_btn.pack(fill="both", expand=True)
 
-        tk.Label(self, text="Schema:", font=("Segoe UI", 10)).grid(row=2, column=0, sticky='e', padx=(16,2), pady=7)
-        self.schema_entry = tk.Entry(self, width=18, font=("Segoe UI", 10))
-        self.schema_entry.grid(row=2, column=1, sticky='ew', padx=(0,8), pady=7)
+        # FILE
+        file_label = tk.Label(self, text="File Excel:", font=("Segoe UI", 10))
+        file_label.grid(row=1, column=0, sticky="w", padx=(18,2), pady=10)
+        self.file_entry = tk.Entry(self, width=36, font=("Segoe UI", 10))
+        self.file_entry.grid(row=2, column=0, sticky='w', padx=(18,2))
+        browse_btn = tk.Button(self, text="Sfoglia", width=10, command=self.browse_file)
+        browse_btn.grid(row=2, column=1, padx=(2,14), pady=4, sticky="w")
 
-        tk.Label(self, text="Tabella:", font=("Segoe UI", 10)).grid(row=2, column=2, sticky='e', padx=(8,2), pady=7)
-        self.table_entry = tk.Entry(self, width=18, font=("Segoe UI", 10))
-        self.table_entry.grid(row=2, column=3, sticky='ew', padx=(0,8), pady=7)
+        # SCHEMA
+        schema_label = tk.Label(self, text="Schema:", font=("Segoe UI", 10))
+        schema_label.grid(row=3, column=0, sticky="w", padx=(18,2), pady=10)
+        self.schema_entry = tk.Entry(self, width=36, font=("Segoe UI", 10))
+        self.schema_entry.grid(row=4, column=0, sticky='w', padx=(18,2))
 
+        # TABELLA
+        table_label = tk.Label(self, text="Tabella:", font=("Segoe UI", 10))
+        table_label.grid(row=5, column=0, sticky="w", padx=(18,2), pady=10)
+        self.table_entry = tk.Entry(self, width=36, font=("Segoe UI", 10))
+        self.table_entry.grid(row=6, column=0, sticky='w', padx=(18,2))
+
+        # DATABASE (solo SQLServer)
         if db_type == "sqlserver":
-            self.db_label = tk.Label(self, text="Database:", font=("Segoe UI", 10))
-            self.db_label.grid(row=2, column=4, sticky='e', padx=(8,2), pady=7)
-            self.db_entry = tk.Entry(self, width=18, font=("Segoe UI", 10))
-            self.db_entry.grid(row=2, column=5, sticky='ew', padx=(0,16), pady=7)
+            db_label = tk.Label(self, text="Database:", font=("Segoe UI", 10))
+            db_label.grid(row=7, column=0, sticky="w", padx=(18,2), pady=10)
+            self.db_entry = tk.Entry(self, width=36, font=("Segoe UI", 10))
+            self.db_entry.grid(row=8, column=0, sticky='w', padx=(18,2))
         else:
-            self.db_label = None
             self.db_entry = None
 
-        convert_btn = tk.Button(self, text="Converti", font=("Segoe UI", 10), command=self.start_conversion)
-        convert_btn.grid(row=4, column=0, columnspan=6, pady=(18,16))
+        # Pulsante Converti in fondo centrale
+        convert_btn = tk.Button(self, text="Converti", font=("Segoe UI", 10), width=21, command=self.start_conversion)
+        convert_btn.grid(row=9, column=0, columnspan=2, pady=(26,12))
 
-    def browse_files(self):
-        files = filedialog.askopenfilenames(
+    def browse_file(self):
+        file_path = filedialog.askopenfilename(
             filetypes=[
                 ("Excel files", "*.xlsx;*.xls;*.csv"),
                 ("All files", "*.*")
             ]
         )
-        self.files_listbox.delete(0, tk.END)
-        for f in files:
-            self.files_listbox.insert(tk.END, f)
+        if file_path:
+            self.file_entry.delete(0, tk.END)
+            self.file_entry.insert(0, file_path)
 
     def start_conversion(self):
-        files = [self.files_listbox.get(i) for i in range(self.files_listbox.size())]
+        file_path = self.file_entry.get()
         db_type = self.db_type
         schema = self.schema_entry.get() if self.schema_entry else ""
         table = self.table_entry.get() if self.table_entry else ""
         database = self.db_entry.get() if self.db_entry else None
-        if not files or not db_type or not schema or not table or not files[0].strip():
+        if not file_path or not db_type or not schema or not table or not file_path.strip():
             messagebox.showwarning("Attenzione", "Completa tutti i campi obbligatori!")
             return
-        reports = []
-        for file_path in files:
-            file_path = file_path.strip()
-            if not file_path:
-                continue
-            reports.append(convert_file(file_path, db_type, schema, table, database))
-        messagebox.showinfo("Risultato Conversione", "\n".join(reports))
+        result = convert_file(file_path, db_type, schema, table, database)
+        messagebox.showinfo("Risultato Conversione", result)
 
 if __name__ == '__main__':
     app = MainApp()
