@@ -16,6 +16,7 @@ target/
 #paths
 build/*
 dist/*
+images/*
 test/*
 
 #other

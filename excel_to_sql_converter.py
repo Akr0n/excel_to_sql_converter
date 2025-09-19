@@ -2,9 +2,13 @@ import pandas as pd
 import os
 import logging
 import tkinter as tk
-from tkinter import filedialog, ttk, messagebox
+from tkinter import filedialog, messagebox
+from PIL import Image, ImageTk
 
 logger = None
+
+ICON_SIZE = (24, 24)
+IMAGES_PATH = "images"
 
 def setup_logging(file_path):
     base = os.path.splitext(os.path.basename(file_path))[0]
@@ -66,88 +70,131 @@ def convert_file(file_path, db_type, schema, table, database=None):
         logging.error(f"Errore conversione: {e}")
         return f"{os.path.basename(file_path)} -> Errore conversione: {e}"
 
-def browse_files():
-    files = filedialog.askopenfilenames(
-        filetypes=[
-            ("Excel files", "*.xlsx;*.xls;*.csv"),
-            ("All files", "*.*")
-        ]
-    )
-    files_listbox.delete(0, tk.END)
-    for f in files:
-        files_listbox.insert(tk.END, f)
+class MainApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Excel to SQL Converter")
+        self.geometry("665x260")
+        self.resizable(False, False)
+        self.db_type = None
+        self.icon_images = {}
+        self.create_db_selection()
+        # Precarica le icone dalla cartella 'images'
+        for dbname, filename in [
+            ('oracle', 'oracle.png'),
+            ('postgres', 'postgres.png'),
+            ('sqlserver', 'sqlserver.png')
+        ]:
+            try:
+                path_icon = os.path.join(IMAGES_PATH, filename)
+                img = Image.open(path_icon).resize(ICON_SIZE, Image.ANTIALIAS)
+                self.icon_images[dbname] = ImageTk.PhotoImage(img)
+            except Exception as e:
+                self.icon_images[dbname] = None
 
-def on_db_change(event):
-    db_type = db_combobox.get().lower()
-    if db_type == "sqlserver":
-        db_label.grid(row=2, column=7, sticky='e', padx=2, pady=5)
-        db_entry.grid(row=2, column=8, sticky='ew', padx=(0,15), pady=5)
-    else:
-        db_label.grid_remove()
-        db_entry.grid_remove()
+    def create_db_selection(self):
+        self.clean_widgets()
+        title = tk.Label(self, text="Scegli il database di destinazione:", font=("Segoe UI", 12, 'bold'))
+        title.pack(pady=24)
+        frame = tk.Frame(self)
+        frame.pack()
 
-def start_conversion():
-    files = [files_listbox.get(i) for i in range(files_listbox.size())]
-    db_type = db_combobox.get().lower()
-    schema = schema_entry.get()
-    table = table_entry.get()
-    database = db_entry.get() if db_type == "sqlserver" else None
-    if not files or not db_type or not schema or not table or not files[0].strip():
-        messagebox.showwarning("Attenzione", "Completa tutti i campi obbligatori!")
-        return
-    reports = []
-    for file_path in files:
-        file_path = file_path.strip()
-        if not file_path:
-            continue
-        reports.append(convert_file(file_path, db_type, schema, table, database))
-    messagebox.showinfo("Risultato Conversioni", "\n".join(reports))
+        btn_oracle = tk.Button(
+            frame,
+            text=" Oracle",
+            font=("Segoe UI", 11, 'bold'),
+            compound="left",
+            image=self.icon_images.get('oracle'),
+            width=140,
+            anchor='w',
+            command=lambda: self.show_main_form("oracle")
+        )
+        btn_oracle.grid(row=0, column=0, padx=16)
+        btn_postgres = tk.Button(
+            frame,
+            text=" Postgres",
+            font=("Segoe UI", 11, 'bold'),
+            compound="left",
+            image=self.icon_images.get('postgres'),
+            width=140,
+            anchor='w',
+            command=lambda: self.show_main_form("postgres")
+        )
+        btn_postgres.grid(row=0, column=1, padx=16)
+        btn_sqlserver = tk.Button(
+            frame,
+            text=" SQL Server",
+            font=("Segoe UI", 11, 'bold'),
+            compound="left",
+            image=self.icon_images.get('sqlserver'),
+            width=160,
+            anchor='w',
+            command=lambda: self.show_main_form("sqlserver")
+        )
+        btn_sqlserver.grid(row=0, column=2, padx=16)
 
-# Costruzione GUI
-root = tk.Tk()
-root.title("Excel to SQL Converter")
+    def clean_widgets(self):
+        for widget in self.winfo_children():
+            widget.destroy()
 
-# Grid configuration for padding/espansione
-for i in range(0, 9):
-    root.grid_columnconfigure(i, weight=1, minsize=20)
+    def show_main_form(self, db_type):
+        self.db_type = db_type
+        self.clean_widgets()
+        file_label = tk.Label(self, text="File Excel (multi):", font=("Segoe UI", 10))
+        file_label.grid(row=0, column=0, sticky="e", padx=(16,2), pady=(16,5))
+        self.files_listbox = tk.Listbox(self, width=60, height=4, selectmode=tk.EXTENDED)
+        self.files_listbox.grid(row=0, column=1, columnspan=3, sticky='ew', padx=(0,5), pady=(16,5))
+        browse_btn = tk.Button(self, text="Sfoglia", width=10, command=self.browse_files)
+        browse_btn.grid(row=0, column=4, padx=(2,16), pady=(16,5))
 
-# Selezione file
-tk.Label(root, text="File Excel (multi):").grid(row=0, column=0, columnspan=2, sticky="e", pady=(10,5), padx=(10,3))
-files_listbox = tk.Listbox(root, width=70, height=4, selectmode=tk.EXTENDED)
-files_listbox.grid(row=0, column=2, columnspan=5, sticky='ew', pady=(10,5), padx=(0,5))
-browse_btn = tk.Button(root, text="Sfoglia", command=browse_files)
-browse_btn.grid(row=0, column=7, columnspan=2, padx=(3,10), pady=(10,5), sticky='w')
+        tk.Label(self, text="Schema:", font=("Segoe UI", 10)).grid(row=2, column=0, sticky='e', padx=(16,2), pady=7)
+        self.schema_entry = tk.Entry(self, width=18, font=("Segoe UI", 10))
+        self.schema_entry.grid(row=2, column=1, sticky='ew', padx=(0,8), pady=7)
 
-# Riga parametri in linea, tutti sufficientemente larghi
-tk.Label(root, text="Tipo Database:").grid(row=2, column=0, sticky='e', padx=(10,2), pady=7)
-db_combobox = ttk.Combobox(root, values=["Postgres", "SQLServer", "Oracle"], state="readonly", width=12)
-db_combobox.grid(row=2, column=1, sticky='ew', padx=(0,8), pady=7)
-db_combobox.current(0)
+        tk.Label(self, text="Tabella:", font=("Segoe UI", 10)).grid(row=2, column=2, sticky='e', padx=(8,2), pady=7)
+        self.table_entry = tk.Entry(self, width=18, font=("Segoe UI", 10))
+        self.table_entry.grid(row=2, column=3, sticky='ew', padx=(0,8), pady=7)
 
-tk.Label(root, text="Schema:").grid(row=2, column=2, sticky='e', padx=(8,2), pady=7)
-schema_entry = tk.Entry(root, width=18)
-schema_entry.grid(row=2, column=3, sticky='ew', padx=(0,8), pady=7)
+        if db_type == "sqlserver":
+            self.db_label = tk.Label(self, text="Database:", font=("Segoe UI", 10))
+            self.db_label.grid(row=2, column=4, sticky='e', padx=(8,2), pady=7)
+            self.db_entry = tk.Entry(self, width=18, font=("Segoe UI", 10))
+            self.db_entry.grid(row=2, column=5, sticky='ew', padx=(0,16), pady=7)
+        else:
+            self.db_label = None
+            self.db_entry = None
 
-tk.Label(root, text="Tabella:").grid(row=2, column=4, sticky='e', padx=(8,2), pady=7)
-table_entry = tk.Entry(root, width=18)
-table_entry.grid(row=2, column=5, sticky='ew', padx=(0,8), pady=7)
+        convert_btn = tk.Button(self, text="Converti", font=("Segoe UI", 10), command=self.start_conversion)
+        convert_btn.grid(row=4, column=0, columnspan=6, pady=(18,16))
 
-db_label = tk.Label(root, text="Database:")
-db_entry = tk.Entry(root, width=18)
+    def browse_files(self):
+        files = filedialog.askopenfilenames(
+            filetypes=[
+                ("Excel files", "*.xlsx;*.xls;*.csv"),
+                ("All files", "*.*")
+            ]
+        )
+        self.files_listbox.delete(0, tk.END)
+        for f in files:
+            self.files_listbox.insert(tk.END, f)
 
-# Bottone converti centrato, largo sull'intera griglia
-convert_btn = tk.Button(root, text="Converti", command=start_conversion)
-convert_btn.grid(row=3, column=0, columnspan=9, pady=(18,16), sticky='n')
+    def start_conversion(self):
+        files = [self.files_listbox.get(i) for i in range(self.files_listbox.size())]
+        db_type = self.db_type
+        schema = self.schema_entry.get() if self.schema_entry else ""
+        table = self.table_entry.get() if self.table_entry else ""
+        database = self.db_entry.get() if self.db_entry else None
+        if not files or not db_type or not schema or not table or not files[0].strip():
+            messagebox.showwarning("Attenzione", "Completa tutti i campi obbligatori!")
+            return
+        reports = []
+        for file_path in files:
+            file_path = file_path.strip()
+            if not file_path:
+                continue
+            reports.append(convert_file(file_path, db_type, schema, table, database))
+        messagebox.showinfo("Risultato Conversione", "\n".join(reports))
 
-db_combobox.bind("<<ComboboxSelected>>", on_db_change)
-
-# Centra la finestra al lancio di default (facoltativo, puoi togliere se non ti serve)
-root.update_idletasks()
-w = root.winfo_screenwidth()
-h = root.winfo_screenheight()
-size = tuple(int(_) for _ in root.geometry().split('+')[0].split('x'))
-x = w//2 - size[0]//2
-y = h//2 - size[1]//2
-root.geometry(f"{size[0]}x{size[1]}+{x}+{y}")
-
-root.mainloop()
+if __name__ == '__main__':
+    app = MainApp()
+    app.mainloop()
