@@ -5,6 +5,9 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 
+#versione corrente
+__version__ = "2.1.0"
+
 logger = None
 
 ICON_SIZE = (24, 24)
