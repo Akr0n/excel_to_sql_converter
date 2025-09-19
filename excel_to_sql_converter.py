@@ -74,12 +74,11 @@ class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Excel to SQL Converter")
-        self.geometry("430x420")
+        self.geometry("430x460")
         self.resizable(False, False)
         self.db_type = None
         self.icon_images = {}
         self.arrow_icon = None
-        # Carica icone database
         for dbname, filename in [
             ('oracle', 'oracle.png'),
             ('postgres', 'postgres.png'),
@@ -89,14 +88,13 @@ class MainApp(tk.Tk):
                 path_icon = os.path.join(IMAGES_PATH, filename)
                 img = Image.open(path_icon).resize(ICON_SIZE, Image.LANCZOS)
                 self.icon_images[dbname] = ImageTk.PhotoImage(img)
-            except Exception as e:
+            except Exception:
                 self.icon_images[dbname] = None
-        # Carica icona Indietro
         try:
             arrow_path = os.path.join(IMAGES_PATH, "barrow.png")
             arrow_img = Image.open(arrow_path).resize(ICON_SIZE, Image.LANCZOS)
             self.arrow_icon = ImageTk.PhotoImage(arrow_img)
-        except Exception as e:
+        except Exception:
             self.arrow_icon = None
         self.show_db_menu()
 
@@ -110,39 +108,39 @@ class MainApp(tk.Tk):
         title.pack(pady=18)
         frame = tk.Frame(self)
         frame.pack(pady=8)
-        # Oracle - primo (in alto)
         btn_oracle = tk.Button(
             frame,
             text=" Oracle",
             font=("Segoe UI", 12, 'bold'),
             compound="left",
             image=self.icon_images.get('oracle'),
-            width=165,
-            anchor='w',
+            width=130, height=38,
+            padx=12,
+            anchor="center",
             command=lambda: self.show_main_form("oracle")
         )
         btn_oracle.grid(row=0, column=0, pady=7)
-        # Postgres - secondo
         btn_postgres = tk.Button(
             frame,
             text=" Postgres",
             font=("Segoe UI", 12, 'bold'),
             compound="left",
             image=self.icon_images.get('postgres'),
-            width=165,
-            anchor='w',
+            width=130, height=38,
+            padx=12,
+            anchor="center",
             command=lambda: self.show_main_form("postgres")
         )
         btn_postgres.grid(row=1, column=0, pady=7)
-        # SQL Server - terzo (in basso)
         btn_sqlserver = tk.Button(
             frame,
             text=" SQL Server",
             font=("Segoe UI", 12, 'bold'),
             compound="left",
             image=self.icon_images.get('sqlserver'),
-            width=165,
-            anchor='w',
+            width=130, height=38,
+            padx=12,
+            anchor="center",
             command=lambda: self.show_main_form("sqlserver")
         )
         btn_sqlserver.grid(row=2, column=0, pady=7)
@@ -150,55 +148,58 @@ class MainApp(tk.Tk):
     def show_main_form(self, db_type):
         self.db_type = db_type
         self.clean_widgets()
-        # bottone "Indietro" (in alto a sinistra)
-        back_frame = tk.Frame(self)
-        back_frame.grid(row=0, column=0, columnspan=2, sticky="nw", padx=(14,0), pady=(14,0))
+
+        # Bottone "Indietro" sempre a sinistra sopra il frame centrale
         back_btn = tk.Button(
-            back_frame,
+            self,
             text=" Indietro",
-            font=("Segoe UI", 10),
-            width=90,
-            height=36,
-            image=self.arrow_icon,
-            compound="left",      # icona a sinistra, testo a destra
-            padx=12,              # padding orizzontale interno
+            font=("Segoe UI", 10), width=90, height=38,
+            compound="left", image=self.arrow_icon,
+            padx=12,
             anchor="center",
             command=self.show_db_menu
         )
-        back_btn.pack(fill="both", expand=True)
+        back_btn.place(x=8, y=8)  # posizionato sempre in alto a sinistra
+
+        # Central frame per tutto il resto, centrato nella finestra
+        center_frame = tk.Frame(self)
+        center_frame.place(relx=0.5, rely=0.15, anchor="n")
+
+
+        spacing = 13  # Spazio verticale tra i campi
 
         # FILE
-        file_label = tk.Label(self, text="File Excel:", font=("Segoe UI", 10))
-        file_label.grid(row=1, column=0, sticky="w", padx=(18,2), pady=10)
-        self.file_entry = tk.Entry(self, width=36, font=("Segoe UI", 10))
-        self.file_entry.grid(row=2, column=0, sticky='w', padx=(18,2))
-        browse_btn = tk.Button(self, text="Sfoglia", width=10, command=self.browse_file)
-        browse_btn.grid(row=2, column=1, padx=(2,14), pady=4, sticky="w")
+        file_label = tk.Label(center_frame, text="File Excel:", font=("Segoe UI", 10))
+        file_label.pack(pady=(6,2))
+        self.file_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.file_entry.pack(pady=(0,spacing))
+        browse_btn = tk.Button(center_frame, text="Sfoglia", width=16, command=self.browse_file)
+        browse_btn.pack(pady=(0,spacing))
 
         # SCHEMA
-        schema_label = tk.Label(self, text="Schema:", font=("Segoe UI", 10))
-        schema_label.grid(row=3, column=0, sticky="w", padx=(18,2), pady=10)
-        self.schema_entry = tk.Entry(self, width=36, font=("Segoe UI", 10))
-        self.schema_entry.grid(row=4, column=0, sticky='w', padx=(18,2))
+        schema_label = tk.Label(center_frame, text="Schema:", font=("Segoe UI", 10))
+        schema_label.pack(pady=(2,2))
+        self.schema_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.schema_entry.pack(pady=(0,spacing))
 
         # TABELLA
-        table_label = tk.Label(self, text="Tabella:", font=("Segoe UI", 10))
-        table_label.grid(row=5, column=0, sticky="w", padx=(18,2), pady=10)
-        self.table_entry = tk.Entry(self, width=36, font=("Segoe UI", 10))
-        self.table_entry.grid(row=6, column=0, sticky='w', padx=(18,2))
+        table_label = tk.Label(center_frame, text="Tabella:", font=("Segoe UI", 10))
+        table_label.pack(pady=(2,2))
+        self.table_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.table_entry.pack(pady=(0,spacing))
 
         # DATABASE (solo SQLServer)
         if db_type == "sqlserver":
-            db_label = tk.Label(self, text="Database:", font=("Segoe UI", 10))
-            db_label.grid(row=7, column=0, sticky="w", padx=(18,2), pady=10)
-            self.db_entry = tk.Entry(self, width=36, font=("Segoe UI", 10))
-            self.db_entry.grid(row=8, column=0, sticky='w', padx=(18,2))
+            db_label = tk.Label(center_frame, text="Database:", font=("Segoe UI", 10))
+            db_label.pack(pady=(2,2))
+            self.db_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+            self.db_entry.pack(pady=(0,spacing))
         else:
             self.db_entry = None
 
-        # Pulsante Converti in fondo centrale
-        convert_btn = tk.Button(self, text="Converti", font=("Segoe UI", 10), width=21, command=self.start_conversion)
-        convert_btn.grid(row=9, column=0, columnspan=2, pady=(26,12))
+        # Converti in fondo centrale nel frame
+        convert_btn = tk.Button(center_frame, text="Converti", font=("Segoe UI", 10), width=23, command=self.start_conversion)
+        convert_btn.pack(pady=(18,6))
 
     def browse_file(self):
         file_path = filedialog.askopenfilename(
