@@ -1,0 +1,64 @@
+name: Build & Release Python Executable for Windows
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+jobs:
+  release-job:
+    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop' }}
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Run PyInstaller
+        run: pyinstaller --onefile --windowed excel_to_sql_converter.py
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Get current version
+        run: |
+          $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
+          echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Create and push tag
+        run: |
+          git config --global user.email "federico.bot@gmail.com"
+          git config --global user.name "Akr0n"
+          git tag v${{ env.VERSION }}
+          git push origin v${{ env.VERSION }}
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ env.VERSION }}
+          release_name: Release v${{ env.VERSION }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/excel_to_sql_converter.exe
+          asset_name: excel_to_sql_converter.exe
+          asset_content_type: application/octet-stream
