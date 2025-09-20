@@ -37,6 +37,22 @@ jobs:
           git tag v${{ env.VERSION }}
           git push origin v${{ env.VERSION }}
 
+      - name: Generate changelog
+        id: gh_changelog
+        uses: janheinrichmerker/action-github-changelog-generator@v2.3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          # Output disponibile come file o come output
+
+      - name: Create Release with changelog
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: ${{ steps.gh_changelog.outputs.changelog }}
+
       - name: Create GitHub Release
         id: create_release
         uses: actions/create-release@v1
