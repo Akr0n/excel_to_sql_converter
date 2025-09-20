@@ -31,10 +31,10 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller --onefile --windowed excel_to_sql_converter.py
 
-      - name: Get current version
-        run: |
-          $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
-          echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
+      #- name: Get current version
+      #  run: |
+      #    $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
+      #    echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Get last tag and increment
         id: version
