@@ -49,14 +49,14 @@ jobs:
             $parts[2] = ([int]$parts[2]) + 1
             $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-$(Get-Date -Format 'yyyyMMddHHmmss')"
           }
-          echo "NEW_VERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Create and push tag
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.NEW_VERSION }}
-          git push origin v${{ env.NEW_VERSION }}
+          git tag v${{ env.NEWVERSION }}
+          git push origin v${{ env.NEWVERSION }}
         
       - name: Generate changelog
         id: changelog
@@ -69,8 +69,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.NEW_VERSION }}
-          release_name: Release v${{ env.NEW_VERSION }}
+          tag_name: v${{ env.NEWVERSION }}
+          release_name: Release v${{ env.NEWVERSION }}
           body: ${{ steps.gh_changelog.outputs.changelog }}
 
       - name: Upload Release Asset

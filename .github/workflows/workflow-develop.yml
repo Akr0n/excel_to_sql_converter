@@ -56,8 +56,8 @@ jobs:
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.NEW_VERSION }}
-          git push origin v${{ env.NEW_VERSION }}
+          git tag v${{ env.NEWVERSION }}
+          git push origin v${{ env.NEWVERSION }}
 
       - name: Generate changelog
         id: changelog
@@ -70,8 +70,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.NEW_VERSION }}
-          release_name: Release v${{ env.NEW_VERSION }}
+          tag_name: v${{ env.NEWVERSION }}
+          release_name: Release v${{ env.NEWVERSION }}
           body: ${{ steps.gh_changelog.outputs.changelog }}
           prerelease: true
 
