@@ -6,7 +6,8 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 
 #versione corrente
-__version__ = "2.1.8"
+__version__ = "2.1.9"
+APP_VERSION = "v2.1.9"
 
 logger = None
 
@@ -99,11 +100,26 @@ class MainApp(tk.Tk):
             self.arrow_icon = ImageTk.PhotoImage(arrow_img)
         except Exception:
             self.arrow_icon = None
+        self.version_label = None
         self.show_db_menu()
 
     def clean_widgets(self):
         for widget in self.winfo_children():
             widget.destroy()
+        self._show_version()
+
+    # Mostra la versione nell'angolo in basso a destra
+    def _show_version(self):
+        if self.version_label:
+            self.version_label.destroy()
+        self.version_label = tk.Label(
+            self,
+            text=f"Versione: {APP_VERSION}",
+            font=("Segoe UI", 8),
+            fg="grey",
+            anchor="se"
+        )
+        self.version_label.place(relx=1.0, rely=1.0, x=-12, y=-8, anchor="se")
 
     def show_db_menu(self):
         self.clean_widgets()
@@ -151,8 +167,6 @@ class MainApp(tk.Tk):
     def show_main_form(self, db_type):
         self.db_type = db_type
         self.clean_widgets()
-
-        # Bottone "Indietro" sempre a sinistra sopra il frame centrale
         back_btn = tk.Button(
             self,
             text=" Indietro",
@@ -164,14 +178,10 @@ class MainApp(tk.Tk):
         )
         back_btn.place(x=8, y=8)  # posizionato sempre in alto a sinistra
 
-        # Central frame per tutto il resto, centrato nella finestra
         center_frame = tk.Frame(self)
-        center_frame.place(relx=0.5, rely=0.15, anchor="n")
+        center_frame.place(relx=0.5, rely=0.13, anchor="n")
+        spacing = 13
 
-
-        spacing = 13  # Spazio verticale tra i campi
-
-        # FILE
         file_label = tk.Label(center_frame, text="File Excel:", font=("Segoe UI", 10))
         file_label.pack(pady=(6,2))
         self.file_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
@@ -179,19 +189,16 @@ class MainApp(tk.Tk):
         browse_btn = tk.Button(center_frame, text="Sfoglia", width=16, command=self.browse_file)
         browse_btn.pack(pady=(0,spacing))
 
-        # SCHEMA
         schema_label = tk.Label(center_frame, text="Schema:", font=("Segoe UI", 10))
         schema_label.pack(pady=(2,2))
         self.schema_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
         self.schema_entry.pack(pady=(0,spacing))
 
-        # TABELLA
         table_label = tk.Label(center_frame, text="Tabella:", font=("Segoe UI", 10))
         table_label.pack(pady=(2,2))
         self.table_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
         self.table_entry.pack(pady=(0,spacing))
 
-        # DATABASE (solo SQLServer)
         if db_type == "sqlserver":
             db_label = tk.Label(center_frame, text="Database:", font=("Segoe UI", 10))
             db_label.pack(pady=(2,2))
@@ -200,9 +207,8 @@ class MainApp(tk.Tk):
         else:
             self.db_entry = None
 
-        # Converti in fondo centrale nel frame
         convert_btn = tk.Button(center_frame, text="Converti", font=("Segoe UI", 10), width=23, command=self.start_conversion)
-        convert_btn.pack(pady=(18,6))
+        convert_btn.pack(pady=(2,18))
 
     def browse_file(self):
         file_path = filedialog.askopenfilename(
