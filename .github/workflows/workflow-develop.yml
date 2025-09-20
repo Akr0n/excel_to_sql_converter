@@ -42,7 +42,6 @@ jobs:
         uses: janheinrichmerker/action-github-changelog-generator@v2.3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # Output disponibile come file o come output
 
       - name: Create Release with changelog
         uses: actions/create-release@v1
