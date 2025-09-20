@@ -44,8 +44,8 @@ jobs:
           git push origin v${{ env.VERSION }}
 
       - name: Generate changelog
-        id: gh_changelog
-        uses: janheinrichmerker/action-github-changelog-generator@v2.3
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -64,10 +64,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.VERSION }}
-          release_name: Release v${{ env.VERSION }}
+          tag_name: v${{ env.VERSION }}_dev
+          release_name: Release v${{ env.VERSION }}_dev
           draft: false
-          prerelease: false
+          prerelease: true
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -75,6 +75,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/excel_to_sql_converter.exe
-          asset_name: excel_to_sql_converter.exe
+          asset_path: ./dist/excel_to_sql_converter_v${{ env.VERSION }}_dev.exe
+          asset_name: excel_to_sql_converter_v${{ env.VERSION }}_dev.exe
           asset_content_type: application/octet-stream
