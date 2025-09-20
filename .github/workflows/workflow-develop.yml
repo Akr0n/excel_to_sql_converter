@@ -41,14 +41,14 @@ jobs:
         shell: pwsh
         run: |
           git fetch --tags
-          $tags = git tag --list "v*_dev" | ForEach-Object { $_.TrimStart("v") -replace "_dev", "" } | Sort-Object { [version]$_ } -Descending
+          $tags = git tag --list "v*-dev" | ForEach-Object { $_.TrimStart("v") -replace "-dev", "" } | Sort-Object {[version]$_} -Descending
           if ($tags.Count -eq 0) {
-            $new_version = "1.0.0_dev"
+            $new_version = "1.0.0-dev"
           } else {
             $last_tag = $tags[0]
             $parts = $last_tag.Split(".")
             $parts[2] = ([int]$parts[2]) + 1
-            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])_dev"
+            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev"
           }
           echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -56,8 +56,8 @@ jobs:
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.NEW_VERSION }}_dev
-          git push origin v${{ env.NEW_VERSION }}_dev
+          git tag v${{ env.NEW_VERSION }}
+          git push origin v${{ env.NEW_VERSION }}
 
       - name: Generate changelog
         id: changelog
@@ -70,8 +70,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.NEW_VERSION }}_dev
-          release_name: Release v${{ env.NEW_VERSION }}_dev
+          tag_name: v${{ env.NEW_VERSION }}
+          release_name: Release v${{ env.NEW_VERSION }}
           body: ${{ steps.gh_changelog.outputs.changelog }}
 
       - name: Create GitHub Release
