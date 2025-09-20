@@ -56,8 +56,8 @@ jobs:
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.NEW_VERSION }}
-          git push origin v${{ env.NEW_VERSION }}
+          git tag v${{ env.NEW_VERSION }}_dev
+          git push origin v${{ env.NEW_VERSION }}_dev
 
       - name: Generate changelog
         id: changelog
