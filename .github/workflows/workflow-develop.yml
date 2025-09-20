@@ -48,7 +48,7 @@ jobs:
             $last_tag = $tags[0]
             $parts = $last_tag.Split(".")
             $parts[2] = ([int]$parts[2]) + 1
-            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev-$(Get-Date -Format 'yyyyMMddHHmmss')"
+            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev"
           }
           echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -66,6 +66,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release with changelog
+        id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
