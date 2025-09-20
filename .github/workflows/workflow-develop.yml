@@ -36,21 +36,21 @@ jobs:
       #    $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
       #    echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
 
-      - name: Get last tag and increment
+      - name: Get last dev tag and increment
         id: version
         shell: pwsh
         run: |
           git fetch --tags
-          $tags = git tag --list "v*" | Sort-Object { $_.TrimStart("v") } -Descending
+          $tags = git tag --list "v*_dev" | ForEach-Object { $_.TrimStart("v") -replace "_dev", "" } | Sort-Object { [version]$_ } -Descending
           if ($tags.Count -eq 0) {
-            $new_version = "1.0.0"
+            $new_version = "1.0.0_dev"
           } else {
-            $last_tag = $tags[0].TrimStart("v")
+            $last_tag = $tags[0]
             $parts = $last_tag.Split(".")
             $parts[2] = ([int]$parts[2]) + 1
-            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])"
+            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])_dev"
           }
-          echo "NEW_VERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Create and push tag
         run: |
