@@ -54,21 +54,24 @@ jobs:
       - name: Build with PyInstaller
         run: pyinstaller --onefile --windowed excel_to_sql_converter.py
 
-      - name: Get last tag and increment
-        id: version
-        shell: pwsh
+      - name: Get last dev tag
+        id: get_tag
         run: |
-          git fetch --tags
-          $tags = git tag --list "v*" | Sort-Object { $_.TrimStart("v") } -Descending
-          if ($tags.Count -eq 0) {
-            $new_version = "1.0.0"
-          } else {
-            $last_tag = $tags[0].TrimStart("v")
-            $parts = $last_tag.Split(".")
-            $parts[2] = ([int]$parts[2]) + 1
-            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])"
+          # prendo l’ultimo tag che finisce con -dev
+          $lastDevTag = git tag --sort=-creatordate | Where-Object { $_ -like "*-dev" } | Select-Object -First 1
+          if (-not $lastDevTag) {
+            Write-Error "❌ No dev tag found!"
+            exit 1
           }
-          echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+          Write-Output "✅ Last dev tag found: $lastDevTag"
+
+          # tolgo il suffisso -dev
+          $releaseVersion = $lastDevTag -replace "-dev",""
+          $releaseTag = "v$releaseVersion"
+
+          echo "release_tag=$releaseTag" >> $env:GITHUB_ENV
+          echo "release_version=$releaseVersion" >> $env:GITHUB_ENV
 
       - name: Create and push tag
         run: |
