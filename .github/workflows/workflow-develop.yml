@@ -46,18 +46,17 @@ jobs:
             $new_version = "1.0.0-dev"
           } else {
             $last_tag = $tags[0]
-            if (-not $last_tag -or $last_tag -eq '') { throw "Tag non valido!" }
+            Write-Output "DEBUG: last_tag=[$last_tag]" # Debug!
             if ($last_tag -is [string] -and $last_tag.Split(".").Length -eq 3) {
               $parts = $last_tag.Split(".")
               $parts[2] = ([int]$parts[2]) + 1
               $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev"
             } else {
-              throw "No valid semver tag found."
+              # Se non va bene il tag, torna al default base!
+              $new_version = "1.0.0-dev"
             }
           }
-          if (-not $new_version -or $new_version -eq '') { throw "Versione non calcolata!" }
           echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
-
 
       - name: Check the new version
         if: env.NEWVERSION == '' || env.NEWVERSION == null
