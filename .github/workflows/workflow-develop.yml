@@ -52,7 +52,6 @@ jobs:
               $parts[2] = ([int]$parts[2]) + 1
               $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev"
             } else {
-              # Se non va bene il tag, torna al default base!
               $new_version = "1.0.0-dev"
             }
           }
