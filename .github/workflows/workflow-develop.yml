@@ -37,54 +37,58 @@ jobs:
           # Recupera tutti i tag
           git fetch --tags
           
-          # Trova tutti i tag dev e prendi l'ultimo
-          $tags = git tag --list "v*-dev" | Sort-Object -Descending
+          # Trova tutti i tag che corrispondono al pattern vX.Y.Z-dev
+          Write-Output "DEBUG: Getting all tags..."
+          $all_tags = git tag --list
+          Write-Output "DEBUG: All tags: $($all_tags -join ', ')"
           
-          if ($tags.Count -eq 0) {
-            # Nessun tag dev esistente, inizia da 1.0.0-dev
-            $new_version = "1.0.0-dev"
-            Write-Output "DEBUG: No existing dev tags found. Starting from $new_version"
-          } else {
-            # Prendi l'ultimo tag dev
-            $last_tag = $tags[0]
-            Write-Output "DEBUG: Found last tag: $last_tag"
-            
-            # Estrai la versione dal tag (rimuovi 'v' all'inizio e '-dev' alla fine)
-            $version_string = $last_tag -replace '^v', '' -replace '-dev$', ''
-            Write-Output "DEBUG: Extracted version: $version_string"
-            
-            # Splitta la versione
-            if ($version_string -match '^(\d+)\.(\d+)\.(\d+)$') {
-              $major = [int]$matches[1]
-              $minor = [int]$matches[2]
-              $patch = [int]$matches[3]
-              
-              # Incrementa il patch number
-              $patch++
-              
-              $new_version = "$major.$minor.$patch"
-              Write-Output "DEBUG: New version will be: $new_version"
-            } else {
-              Write-Output "WARNING: Could not parse version from $last_tag, using 1.0.0"
-              $new_version = "1.0.0"
+          # Filtra solo i tag nel formato corretto vX.Y.Z-dev
+          $dev_tags = @()
+          foreach ($tag in $all_tags) {
+            if ($tag -match '^v(\d+)\.(\d+)\.(\d+)-dev$') {
+              $dev_tags += $tag
             }
           }
           
-          # Aggiungi il suffisso -dev
-          $new_version_with_dev = "$new_version-dev"
+          Write-Output "DEBUG: Found dev tags: $($dev_tags -join ', ')"
           
-          # Verifica che il nuovo tag non esista già
-          $new_tag = "v$new_version_with_dev"
-          $existing = git tag --list $new_tag
-          if ($existing) {
-            Write-Output "ERROR: Tag $new_tag already exists!"
-            exit 1
+          if ($dev_tags.Count -eq 0) {
+            # Nessun tag dev esistente, inizia da 1.0.0-dev
+            Write-Output "No existing dev tags found, starting from 1.0.0-dev"
+            $new_version = "1.0.0-dev"
+          } else {
+            # Trova la versione più alta
+            $highest_version = @{major=0; minor=0; patch=0}
+            
+            foreach ($tag in $dev_tags) {
+              if ($tag -match '^v(\d+)\.(\d+)\.(\d+)-dev$') {
+                $major = [int]$matches[1]
+                $minor = [int]$matches[2] 
+                $patch = [int]$matches[3]
+                
+                if (($major -gt $highest_version.major) -or 
+                    ($major -eq $highest_version.major -and $minor -gt $highest_version.minor) -or
+                    ($major -eq $highest_version.major -and $minor -eq $highest_version.minor -and $patch -gt $highest_version.patch)) {
+                  $highest_version.major = $major
+                  $highest_version.minor = $minor
+                  $highest_version.patch = $patch
+                }
+              }
+            }
+            
+            # Incrementa la patch version
+            $new_patch = $highest_version.patch + 1
+            $new_version = "$($highest_version.major).$($highest_version.minor).$new_patch"
+            Write-Output "Incremented from v$($highest_version.major).$($highest_version.minor).$($highest_version.patch)-dev to v$new_version-dev"
           }
           
-          # Salva la versione nell'environment
-          echo "NEWVERSION=$new_version_with_dev" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "VERSION_TAG=$new_tag" | Out-File -FilePath $env:GITHUB_ENV -Append
-          Write-Output "Will create tag: $new_tag"
+          $version_tag = "v$new_version-dev"
+          Write-Output "New version will be: $new_version"
+          Write-Output "New tag created: $version_tag"
+          
+          # Setta le variabili di ambiente
+          echo "NEWVERSION=$new_version" >> $env:GITHUB_ENV
+          echo "VERSION_TAG=$version_tag" >> $env:GITHUB_ENV
 
       - name: Check the new version
         run: |
@@ -135,3 +139,4 @@ jobs:
           asset_path: ./dist/excel_to_sql_converter.exe
           asset_name: excel_to_sql_converter.exe
           asset_content_type: application/octet-stream
+          
