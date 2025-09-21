@@ -11,8 +11,17 @@ APP_VERSION = "2.1.9"
 
 logger = None
 
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 ICON_SIZE = (24, 24)
-IMAGES_PATH = "images"
+IMAGES_PATH = resource_path("images")
 
 def setup_logging(file_path):
     base = os.path.splitext(os.path.basename(file_path))[0]
