@@ -1,11 +1,9 @@
 name: Build & Release Python Executable for Windows
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-    types:
-      - closed
 
 jobs:
   release-job:
@@ -30,17 +28,33 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Get current version
+      #- name: Get current version
+      #  run: |
+      #   $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
+      #   echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Get last tag and increment
+        id: version
+        shell: pwsh
         run: |
-          $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
-          echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
+          git fetch --tags
+          $tags = git tag --list "v*" | Sort-Object { $_.TrimStart("v") } -Descending
+          if ($tags.Count -eq 0) {
+            $new_version = "1.0.0"
+          } else {
+            $last_tag = $tags[0].TrimStart("v")
+            $parts = $last_tag.Split(".")
+            $parts[2] = ([int]$parts[2]) + 1
+            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])"
+          }
+          echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Create and push tag
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.VERSION }}
-          git push origin v${{ env.VERSION }}
+          git tag v${{ env.NEWVERSION }}
+          git push origin v${{ env.NEWVERSION }}
         
       - name: Generate changelog
         id: changelog
@@ -53,20 +67,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
+          tag_name: v${{ env.NEWVERSION }}
+          release_name: Release v${{ env.NEWVERSION }}
           body: ${{ steps.gh_changelog.outputs.changelog }}
-
-      - name: Create GitHub Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ env.VERSION }}
-          release_name: Release v${{ env.VERSION }}
-          draft: false
-          prerelease: false
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
@@ -74,6 +77,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/excel_to_sql_converter_v${{ env.VERSION }}.exe
-          asset_name: excel_to_sql_converter_v${{ env.VERSION }}.exe
+          asset_path: ./dist/excel_to_sql_converter.exe
+          asset_name: excel_to_sql_converter.exe
           asset_content_type: application/octet-stream

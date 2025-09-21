@@ -13,68 +13,130 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Importante per avere tutti i tag
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
         
       - name: Install PyInstaller
         run: pip install pyinstaller
 
-      - name: Run PyInstaller
-        run: pyinstaller --onefile --windowed excel_to_sql_converter.py
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
       - name: Build with PyInstaller
         run: pyinstaller --onefile --windowed excel_to_sql_converter.py
 
-      - name: Get current version
+      - name: Get last dev tag and increment
+        id: version
+        shell: pwsh
         run: |
-          $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
-          echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
+          # Recupera tutti i tag
+          git fetch --tags
+          
+          # Trova tutti i tag che corrispondono al pattern vX.Y.Z-dev
+          Write-Output "DEBUG: Getting all tags..."
+          $all_tags = git tag --list
+          Write-Output "DEBUG: All tags: $($all_tags -join ', ')"
+          
+          # Filtra solo i tag nel formato corretto vX.Y.Z-dev
+          $dev_tags = @()
+          foreach ($tag in $all_tags) {
+            if ($tag -match '^v(\d+)\.(\d+)\.(\d+)-dev$') {
+              $dev_tags += $tag
+            }
+          }
+          
+          Write-Output "DEBUG: Found dev tags: $($dev_tags -join ', ')"
+          
+          if ($dev_tags.Count -eq 0) {
+            # Nessun tag dev esistente, inizia da 1.0.0-dev
+            Write-Output "No existing dev tags found, starting from 1.0.0-dev"
+            $new_version = "1.0.0-dev"
+          } else {
+            # Trova la versione più alta
+            $highest_version = @{major=0; minor=0; patch=0}
+            
+            foreach ($tag in $dev_tags) {
+              if ($tag -match '^v(\d+)\.(\d+)\.(\d+)-dev$') {
+                $major = [int]$matches[1]
+                $minor = [int]$matches[2] 
+                $patch = [int]$matches[3]
+                
+                if (($major -gt $highest_version.major) -or 
+                    ($major -eq $highest_version.major -and $minor -gt $highest_version.minor) -or
+                    ($major -eq $highest_version.major -and $minor -eq $highest_version.minor -and $patch -gt $highest_version.patch)) {
+                  $highest_version.major = $major
+                  $highest_version.minor = $minor
+                  $highest_version.patch = $patch
+                }
+              }
+            }
+            
+            # Incrementa la patch version
+            $new_patch = $highest_version.patch + 1
+            $new_version = "$($highest_version.major).$($highest_version.minor).$new_patch"
+            Write-Output "Incremented from v$($highest_version.major).$($highest_version.minor).$($highest_version.patch)-dev to v$new_version-dev"
+          }
+          
+          $version_tag = "v$new_version-dev"
+          Write-Output "New version will be: $new_version"
+          Write-Output "New tag created: $version_tag"
+          
+          # Setta le variabili di ambiente
+          echo "NEWVERSION=$new_version" >> $env:GITHUB_ENV
+          echo "VERSION_TAG=$version_tag" >> $env:GITHUB_ENV
+
+      - name: Check the new version
+        run: |
+          if ("${{ env.NEWVERSION }}" -eq "") {
+            echo "::error::NEWVERSION non valorizzato! Build interrotta."
+            exit 1
+          }
+          echo "Creating version: ${{ env.NEWVERSION }}"
+          echo "Tag will be: ${{ env.VERSION_TAG }}"
 
       - name: Create and push tag
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.VERSION }}
-          git push origin v${{ env.VERSION }}
+          git tag ${{ env.VERSION_TAG }}
+          git push origin ${{ env.VERSION_TAG }}
 
       - name: Generate changelog
         id: changelog
         uses: mikepenz/release-changelog-builder-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          toTag: ${{ env.VERSION_TAG }}
+          configuration: |
+            {
+              "template": "#{{CHANGELOG}}\n\n**Full Changelog**: #{{RELEASE_DIFF}}",
+              "pr_template": "- #{{TITLE}} by @#{{AUTHOR}} in ##{{NUMBER}}"
+            }
 
-      - name: Create Release with changelog
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: ${{ steps.gh_changelog.outputs.changelog }}
-
-      - name: Create GitHub Release
+      - name: Create release with changelog
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.VERSION }}_dev
-          release_name: Release v${{ env.VERSION }}_dev
-          draft: false
+          tag_name: ${{ env.VERSION_TAG }}
+          release_name: Release ${{ env.VERSION_TAG }}
+          body: ${{ steps.changelog.outputs.changelog }}
           prerelease: true
+          draft: false
 
-      - name: Upload Release Asset
+      - name: Upload release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/excel_to_sql_converter_v${{ env.VERSION }}_dev.exe
-          asset_name: excel_to_sql_converter_v${{ env.VERSION }}_dev.exe
+          asset_path: ./dist/excel_to_sql_converter.exe
+          asset_name: excel_to_sql_converter.exe
           asset_content_type: application/octet-stream
+          
