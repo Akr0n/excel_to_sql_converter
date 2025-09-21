@@ -1,11 +1,9 @@
 name: Build & Release Python Executable for Windows
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-    types:
-      - closed
 
 jobs:
   release-job:
