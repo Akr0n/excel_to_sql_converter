@@ -38,9 +38,9 @@ jobs:
           git fetch --tags
           
           # Trova tutti i tag che corrispondono al pattern vX.Y.Z-dev
-          Write-Output "DEBUG: Getting all tags..."
+          Write-Output "⚠️ DEBUG: Getting all tags..."
           $all_tags = git tag --list
-          Write-Output "DEBUG: All tags: $($all_tags -join ', ')"
+          Write-Output "⚠️ DEBUG: Listing all tags: $($all_tags -join ', ')"
           
           # Filtra solo i tag nel formato corretto vX.Y.Z-dev
           $dev_tags = @()
@@ -50,11 +50,11 @@ jobs:
             }
           }
           
-          Write-Output "DEBUG: Found dev tags: $($dev_tags -join ', ')"
+          Write-Output "⚠️ DEBUG: Found dev tags: $($dev_tags -join ', ')"
           
           if ($dev_tags.Count -eq 0) {
             # Nessun tag dev esistente, inizia da 1.0.0-dev
-            Write-Output "No existing dev tags found, starting from 1.0.0-dev"
+            Write-Output "⚠️ No existing dev tags found, starting from 1.0.0-dev"
             $new_version = "1.0.0-dev"
           } else {
             # Trova la versione più alta
@@ -79,12 +79,12 @@ jobs:
             # Incrementa la patch version
             $new_patch = $highest_version.patch + 1
             $new_version = "$($highest_version.major).$($highest_version.minor).$new_patch"
-            Write-Output "Incremented from v$($highest_version.major).$($highest_version.minor).$($highest_version.patch)-dev to v$new_version-dev"
+            Write-Output "✅ Incremented from v$($highest_version.major).$($highest_version.minor).$($highest_version.patch)-dev to v$new_version-dev"
           }
           
           $version_tag = "v$new_version-dev"
-          Write-Output "New version will be: $new_version"
-          Write-Output "New tag created: $version_tag"
+          Write-Output "✅ New version will be: $new_version"
+          Write-Output "✅ New tag created: $version_tag"
           
           # Setta le variabili di ambiente
           echo "NEWVERSION=$new_version" >> $env:GITHUB_ENV
@@ -93,7 +93,7 @@ jobs:
       - name: Check the new version
         run: |
           if ("${{ env.NEWVERSION }}" -eq "") {
-            echo "::error::NEWVERSION non valorizzato! Build interrotta."
+            echo "❌ ::error::NEWVERSION not set! Stopping the workflow."
             exit 1
           }
           echo "Creating version: ${{ env.NEWVERSION }}"
