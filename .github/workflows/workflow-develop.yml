@@ -41,14 +41,19 @@ jobs:
         shell: pwsh
         run: |
           git fetch --tags
-          $tags = git tag --list "v*-dev" | ForEach-Object { $_.TrimStart("v") -replace "-dev", "" } | Sort-Object {[version]$_} -Descending
+          $tags = git tag --list "v*-dev" | ForEach-Object { $_.TrimStart("v") -replace "-dev", "" } | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | Sort-Object {[version]$_} -Descending
           if ($tags.Count -eq 0) {
             $new_version = "1.0.0-dev"
           } else {
             $last_tag = $tags[0]
-            $parts = $last_tag.Split(".")
-            $parts[2] = ([int]$parts[2]) + 1
-            $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev"
+            Write-Output "DEBUG: last_tag=[$last_tag]"  # Debug!
+            if ($last_tag -is [string]) {
+              $parts = $last_tag.Split(".")
+              $parts[2] = ([int]$parts[2]) + 1
+              $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev"
+            } else {
+              throw "No valid semver tag found."
+            }
           }
           echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
