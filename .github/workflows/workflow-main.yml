@@ -29,7 +29,7 @@ jobs:
           if ($parts.Count -ne 3) {
             Write-Output "❌ The last commit is not a merge from develop. Stopping the workflow."
             Add-Content -Path $env:GITHUB_ENV -Value "MERGE_FROM_DEVELOP=false"
-            Write-Output "⚠️ merge_from_develop=false" >> $GITHUB_ENV
+            echo "MERGE_FROM_DEVELOP=false" >> $env:GITHUB_ENV
             exit 0
           }
 
@@ -45,12 +45,12 @@ jobs:
 
           if ($parent1 -eq $developSHA -or $parent2 -eq $developSHA) {
             Write-Output "✅ The last commit is a merge from develop."
-            Add-Content -Path $env:GITHUB_ENV -Value "MERGE_FROM_DEVELOP=true"
-            Write-Output "⚠️ merge_from_develop=true" >> $env:GITHUB_ENV
+            # Add-Content -Path $env:GITHUB_ENV -Value "MERGE_FROM_DEVELOP=true"
+            echo "MERGE_FROM_DEVELOP=true" >> $env:GITHUB_ENV
           } else {
             Write-Output "❌ The last commit does not contain develop as a parent. Stopping the workflow."
-            Add-Content -Path $env:GITHUB_ENV -Value "MERGE_FROM_DEVELOP=false"
-            Write-Output "⚠️ merge_from_develop=false" >> $GITHUB_ENV
+            # Add-Content -Path $env:GITHUB_ENV -Value "MERGE_FROM_DEVELOP=false"
+            echo "MERGE_FROM_DEVELOP=false" >> $env:GITHUB_ENV
             exit 0
           }
       
@@ -83,11 +83,11 @@ jobs:
 
           # tolgo il suffisso -dev
           $releaseVersion = $lastDevTag -replace "-dev",""
-          Write-Output "⚠️ DEBUG: Stampo la variabile che riporta la versione che verrà usata --> $releaseVersion"
+          Write-Output "⚠️ Versione che verrà usata --> $releaseVersion"
           $releaseTag = "$releaseVersion"
 
-          Write-Output "✅ release_tag=$releaseTag" >> $env:GITHUB_ENV
-          Write-Output "✅ release_version=$releaseVersion" >> $env:GITHUB_ENV
+          echo "release_tag=$releaseTag" >> $env:GITHUB_ENV
+          echo "release_version=$releaseVersion" >> $env:GITHUB_ENV
 
       - name: Create and push tag
         run: |
