@@ -71,8 +71,9 @@ jobs:
       - name: Get last dev tag
         id: get_tag
         run: |
-          # prendo l’ultimo tag che finisce con -dev
-          $lastDevTag = git tag --sort=-creatordate | Where-Object { $_ -like "*-dev" } | Select-Object -First 1
+          # elenco tutti i tag e prendo l’ultimo che finisce con -dev
+          git fetch --tags
+          $lastDevTag = git tag --list "v*-dev" | Sort-Object {[version]($_.TrimStart("v") -replace "-dev","")} -Descending | Select-Object -First 1
           if (-not $lastDevTag) {
             Write-Error "❌ No dev tag found!"
             exit 1
@@ -82,10 +83,11 @@ jobs:
 
           # tolgo il suffisso -dev
           $releaseVersion = $lastDevTag -replace "-dev",""
+          Write-Output "⚠️ DEBUG: $releaseVersion"
           $releaseTag = "v$releaseVersion"
 
-          echo "release_tag=$releaseTag" >> $env:GITHUB_ENV
-          echo "release_version=$releaseVersion" >> $env:GITHUB_ENV
+          Write-Output "✅ release_tag=$releaseTag" >> $env:GITHUB_ENV
+          Write-Output "✅ release_version=$releaseVersion" >> $env:GITHUB_ENV
 
       - name: Create and push tag
         run: |
