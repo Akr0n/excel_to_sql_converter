@@ -19,24 +19,38 @@ jobs:
         run: |
           # SHA dell'ultimo commit su main
           $LAST_COMMIT = (git rev-parse HEAD).Trim()
+          Write-Output "⚠️ HEAD: $LAST_COMMIT"
 
           # conta i parent (se sono 2 parent -> merge commit)
           $PARENTS = (git rev-list --parents -n 1 $LAST_COMMIT).Split(" ")
+          Write-Output "⚠️ Parents: $PARENTS"
 
-          if ($PARENTS.Count -ne 3) {
+          $parts = $PARENTS -split ' '
+          if ($parts.Count -ne 3) {
             Write-Output "❌ The last commit is not a merge from develop. Stopping the workflow."
-            echo "merge_from_develop=false" >> $GITHUB_ENV
+            Add-Content -Path $env:GITHUB_ENV -Value "MERGE_FROM_DEVELOP=false"
+            Write-Output "⚠️ merge_from_develop=false" >> $GITHUB_ENV
             exit 0
           }
 
-          # controlla se uno dei parent è develop
-          $DEVELOP_SHA = (git rev-parse origin/develop).Trim()
-          if ($PARENTS -contains $DEVELOP_SHA) {
-            echo "merge_from_develop=true" >> $env:GITHUB_ENV
-          }
-          else {
+          # parent SHAs (i due parent dopo lo SHA del merge commit)
+          $parent1 = $parts[1]
+          $parent2 = $parts[2]
+
+          # assicuriamoci di avere il riferimento origin/develop aggiornato
+          git fetch origin develop
+
+          $developSHA = (git rev-parse origin/develop).Trim()
+          Write-Output "⚠️ origin/develop SHA: $developSHA"
+
+          if ($parent1 -eq $developSHA -or $parent2 -eq $developSHA) {
+            Write-Output "✅ The last commit is a merge from develop."
+            Add-Content -Path $env:GITHUB_ENV -Value "MERGE_FROM_DEVELOP=true"
+            Write-Output "⚠️ merge_from_develop=true" >> $env:GITHUB_ENV
+          } else {
             Write-Output "❌ The last commit does not contain develop as a parent. Stopping the workflow."
-            echo "merge_from_develop=false" >> $GITHUB_ENV
+            Add-Content -Path $env:GITHUB_ENV -Value "MERGE_FROM_DEVELOP=false"
+            Write-Output "⚠️ merge_from_develop=false" >> $GITHUB_ENV
             exit 0
           }
       
