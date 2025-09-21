@@ -93,8 +93,8 @@ jobs:
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.GITHUB_ENV }}
-          git push origin v${{ env.GITHUB_ENV }}
+          git tag ${{ env.release_tag }}
+          git push origin ${{ env.release_tag }}
         
       - name: Generate changelog
         id: changelog
@@ -103,13 +103,14 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release with changelog
+        id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.GITHUB_ENV }}
-          release_name: Release v${{ env.GITHUB_ENV }}
-          body: ${{ steps.gh_changelog.outputs.changelog }}
+          tag_name: ${{ env.release_tag }}
+          release_name: Release ${{ env.release_tag }}
+          body: ${{ steps.changelog.outputs.changelog }}
 
       - name: Upload Release Asset
         uses: actions/upload-release-asset@v1
