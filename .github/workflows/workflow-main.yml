@@ -84,7 +84,7 @@ jobs:
           # tolgo il suffisso -dev
           $releaseVersion = $lastDevTag -replace "-dev",""
           Write-Output "⚠️ DEBUG: Stampo la variabile che riporta la versione che verrà usata --> $releaseVersion"
-          $releaseTag = "v$releaseVersion"
+          $releaseTag = "$releaseVersion"
 
           Write-Output "✅ release_tag=$releaseTag" >> $env:GITHUB_ENV
           Write-Output "✅ release_version=$releaseVersion" >> $env:GITHUB_ENV
@@ -93,8 +93,8 @@ jobs:
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.NEWVERSION }}
-          git push origin v${{ env.NEWVERSION }}
+          git tag v${{ env.GITHUB_ENV }}
+          git push origin v${{ env.GITHUB_ENV }}
         
       - name: Generate changelog
         id: changelog
@@ -107,8 +107,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.NEWVERSION }}
-          release_name: Release v${{ env.NEWVERSION }}
+          tag_name: v${{ env.GITHUB_ENV }}
+          release_name: Release v${{ env.GITHUB_ENV }}
           body: ${{ steps.gh_changelog.outputs.changelog }}
 
       - name: Upload Release Asset
