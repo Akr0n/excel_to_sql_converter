@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 
 #versione corrente
-APP_VERSION = "1.0.11"
+APP_VERSION = "1.0.12"
 
 logger = None
 
