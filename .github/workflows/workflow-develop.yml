@@ -13,68 +13,106 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Importante per avere tutti i tag
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.x'
+      
+      - name: Install dependencies
+        run: pip install -r requirements.txt
         
       - name: Install PyInstaller
         run: pip install pyinstaller
 
-      - name: Run PyInstaller
-        run: pyinstaller --onefile --windowed excel_to_sql_converter.py
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
       - name: Build with PyInstaller
         run: pyinstaller --onefile --windowed excel_to_sql_converter.py
-
-      #- name: Get current version
-      #  run: |
-      #    $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
-      #    echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Get last dev tag and increment
         id: version
         shell: pwsh
         run: |
+          # Recupera tutti i tag
           git fetch --tags
-          $tags = git tag --list "v*-dev" | ForEach-Object { $_.TrimStart("v") -replace "-dev", "" } | Where-Object { $_ -match '^\d+\.\d+\.\d+$' } | Sort-Object {[version]$_} -Descending
+          
+          # Trova tutti i tag dev e prendi l'ultimo
+          $tags = git tag --list "v*-dev" | Sort-Object -Descending
+          
           if ($tags.Count -eq 0) {
+            # Nessun tag dev esistente, inizia da 1.0.0-dev
             $new_version = "1.0.0-dev"
+            Write-Output "DEBUG: No existing dev tags found. Starting from $new_version"
           } else {
+            # Prendi l'ultimo tag dev
             $last_tag = $tags[0]
-            Write-Output "DEBUG: last_tag=[$last_tag]" # Debug!
-            if ($last_tag -is [string] -and $last_tag.Split(".").Length -eq 3) {
-              $parts = $last_tag.Split(".")
-              $parts[2] = ([int]$parts[2]) + 1
-              $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev"
+            Write-Output "DEBUG: Found last tag: $last_tag"
+            
+            # Estrai la versione dal tag (rimuovi 'v' all'inizio e '-dev' alla fine)
+            $version_string = $last_tag -replace '^v', '' -replace '-dev$', ''
+            Write-Output "DEBUG: Extracted version: $version_string"
+            
+            # Splitta la versione
+            if ($version_string -match '^(\d+)\.(\d+)\.(\d+)$') {
+              $major = [int]$matches[1]
+              $minor = [int]$matches[2]
+              $patch = [int]$matches[3]
+              
+              # Incrementa il patch number
+              $patch++
+              
+              $new_version = "$major.$minor.$patch"
+              Write-Output "DEBUG: New version will be: $new_version"
             } else {
-              $new_version = "1.0.0-dev"
+              Write-Output "WARNING: Could not parse version from $last_tag, using 1.0.0"
+              $new_version = "1.0.0"
             }
           }
-          echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          
+          # Aggiungi il suffisso -dev
+          $new_version_with_dev = "$new_version-dev"
+          
+          # Verifica che il nuovo tag non esista già
+          $new_tag = "v$new_version_with_dev"
+          $existing = git tag --list $new_tag
+          if ($existing) {
+            Write-Output "ERROR: Tag $new_tag already exists!"
+            exit 1
+          }
+          
+          # Salva la versione nell'environment
+          echo "NEWVERSION=$new_version_with_dev" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "VERSION_TAG=$new_tag" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Output "Will create tag: $new_tag"
 
       - name: Check the new version
-        if: env.NEWVERSION == '' || env.NEWVERSION == null
         run: |
-          echo "::error::NEWVERSION non valorizzato! Build interrotta."
-          exit 1
+          if ("${{ env.NEWVERSION }}" -eq "") {
+            echo "::error::NEWVERSION non valorizzato! Build interrotta."
+            exit 1
+          }
+          echo "Creating version: ${{ env.NEWVERSION }}"
+          echo "Tag will be: ${{ env.VERSION_TAG }}"
 
       - name: Create and push tag
         run: |
           git config --global user.email "federico.bot@gmail.com"
           git config --global user.name "Akr0n"
-          git tag v${{ env.NEWVERSION }}
-          git push origin v${{ env.NEWVERSION }}
+          git tag ${{ env.VERSION_TAG }}
+          git push origin ${{ env.VERSION_TAG }}
 
       - name: Generate changelog
         id: changelog
         uses: mikepenz/release-changelog-builder-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          toTag: ${{ env.VERSION_TAG }}
+          configuration: |
+            {
+              "template": "#{{CHANGELOG}}\n\n**Full Changelog**: #{{RELEASE_DIFF}}",
+              "pr_template": "- #{{TITLE}} by @#{{AUTHOR}} in ##{{NUMBER}}"
+            }
 
       - name: Create release with changelog
         id: create_release
@@ -82,10 +120,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: v${{ env.NEWVERSION }}
-          release_name: Release v${{ env.NEWVERSION }}
-          body: ${{ steps.gh_changelog.outputs.changelog }}
+          tag_name: ${{ env.VERSION_TAG }}
+          release_name: Release ${{ env.VERSION_TAG }}
+          body: ${{ steps.changelog.outputs.changelog }}
           prerelease: true
+          draft: false
 
       - name: Upload release Asset
         uses: actions/upload-release-asset@v1
