@@ -83,7 +83,7 @@ jobs:
 
           # tolgo il suffisso -dev
           $releaseVersion = $lastDevTag -replace "-dev",""
-          Write-Output "⚠️ DEBUG: $releaseVersion"
+          Write-Output "⚠️ DEBUG: Stampo la variabile che riporta la versione che verrà usata --> $releaseVersion"
           $releaseTag = "v$releaseVersion"
 
           Write-Output "✅ release_tag=$releaseTag" >> $env:GITHUB_ENV
