@@ -1,4 +1,4 @@
-name: Build & Release Python Executable for Windows
+name: PROD - Build & Release Python Executable for Windows
 
 on:
   push:
@@ -7,31 +7,51 @@ on:
 
 jobs:
   release-job:
-    if: ${{ github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main' && github.event.pull_request.head.ref == 'develop' }}
-    runs-on: windows-latest
-
+    runs-on: windows-latest        
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # serve per avere tutta la history
 
+      - name: Check if the last commit is a merge from develop
+        id: check_merge
+        run: |
+          # recupera SHA dell'ultimo commit su main
+          LAST_COMMIT=$(git rev-parse HEAD)
+
+          # conta i parent (se =2 allora è un merge)
+          PARENTS=$(git rev-list --parents -n 1 $LAST_COMMIT | wc -w)
+
+          if [ "$PARENTS" -ne 3 ]; then
+            echo "⚠️ The last commit is not a merge from develop. Stopping the workflow."
+            echo "merge_from_develop=false" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          # controlla se uno dei parent è develop
+          DEVELOP_SHA=$(git rev-parse origin/develop)
+          if git rev-list --parents -n 1 $LAST_COMMIT | grep -q "$DEVELOP_SHA"; then
+            echo "merge_from_develop=true" >> $GITHUB_ENV
+          else
+            echo "⚠️ The last commit does not contain develop as a parent. Stopping the workflow."
+            echo "merge_from_develop=false" >> $GITHUB_ENV
+            exit 0
+          fi
+      
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.x'
 
-      - name: Install PyInstaller
-        run: pip install pyinstaller
-
-      - name: Run PyInstaller
-        run: pyinstaller --onefile --windowed excel_to_sql_converter.py
-
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      #- name: Get current version
-      #  run: |
-      #   $VERSION = python -c "from excel_to_sql_converter import __version__; print(__version__)"
-      #   echo "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+
+      - name: Build with PyInstaller
+        run: pyinstaller --onefile --windowed excel_to_sql_converter.py
 
       - name: Get last tag and increment
         id: version

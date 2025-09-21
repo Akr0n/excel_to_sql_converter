@@ -1,4 +1,4 @@
-name: Build & Release Python Executable (Windows)
+name: DEV - Build & Release Python Executable for Windows
 
 on:
   push:
