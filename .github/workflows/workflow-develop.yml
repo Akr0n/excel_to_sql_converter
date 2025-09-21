@@ -46,8 +46,8 @@ jobs:
             $new_version = "1.0.0-dev"
           } else {
             $last_tag = $tags[0]
-            Write-Output "DEBUG: last_tag=[$last_tag]"  # Debug!
-            if ($last_tag -is [string]) {
+            if (-not $last_tag -or $last_tag -eq '') { throw "Tag non valido!" }
+            if ($last_tag -is [string] -and $last_tag.Split(".").Length -eq 3) {
               $parts = $last_tag.Split(".")
               $parts[2] = ([int]$parts[2]) + 1
               $new_version = "$($parts[0]).$($parts[1]).$($parts[2])-dev"
@@ -55,7 +55,15 @@ jobs:
               throw "No valid semver tag found."
             }
           }
+          if (-not $new_version -or $new_version -eq '') { throw "Versione non calcolata!" }
           echo "NEWVERSION=$new_version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+
+      - name: Check the new version
+        if: env.NEWVERSION == '' || env.NEWVERSION == null
+        run: |
+          echo "::error::NEWVERSION non valorizzato! Build interrotta."
+          exit 1
 
       - name: Create and push tag
         run: |
@@ -70,7 +78,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create Release with changelog
+      - name: Create release with changelog
         id: create_release
         uses: actions/create-release@v1
         env:
@@ -81,7 +89,7 @@ jobs:
           body: ${{ steps.gh_changelog.outputs.changelog }}
           prerelease: true
 
-      - name: Upload Release Asset
+      - name: Upload release Asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
