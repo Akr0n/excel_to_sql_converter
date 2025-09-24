@@ -66,7 +66,7 @@ jobs:
         run: pip install pyinstaller
 
       - name: Build with PyInstaller
-        run: pyinstaller --onefile --windowed --add-data "images;images" excel_to_sql_converter.py
+        run: pyinstaller --onefile --windowed --icon=images/icon.ico --add-data "images;images" excel_to_sql_converter.py
 
       - name: Get last dev tag
         id: get_tag
