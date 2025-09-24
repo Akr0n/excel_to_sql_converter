@@ -50,7 +50,7 @@ def format_insert(db_type, schema, table, df):
                 values.append(f"'{str(val).replace("'", "''")}'")
         cols = ", ".join([f'"{col}"' for col in columns]) if db_type == 'postgres' else ", ".join(columns)
         vals = ", ".join(values)
-        statements.append(f'INSERT INTO {schema}.{table} ({cols}) VALUES ({vals});')
+        statements.append(f'INSERT INTO [{schema}].[{table}] ({cols}) VALUES ({vals});')
     logging.info(f"Generati {len(statements)} statements INSERT")
     return "\n".join(statements)
 
@@ -73,8 +73,8 @@ def convert_file(file_path, db_type, schema, table, database=None):
         out_file = os.path.join(dir_path, f"{base}.sql")
         with open(out_file, "w", encoding="utf-8") as f:
             if db_type == "sqlserver" and database:
-                f.write(f"USE {database}\nGO\n\n")
-            f.write(f"DELETE FROM {schema}.{table};\nGO\n\n")
+                f.write(f"USE [{database}]\nGO\n\n")
+            f.write(f"DELETE FROM [{schema}].[{table}];\nGO\n\n")
             f.write(sql_insert)
         logging.info(f"Conversione terminata correttamente. File SQL generato: {out_file}")
         return f"{os.path.basename(file_path)} -> OK (Generato: {out_file})"
