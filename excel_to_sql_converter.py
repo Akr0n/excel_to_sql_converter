@@ -6,7 +6,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 
 #versione corrente
-APP_VERSION = "1.0.15"
+APP_VERSION = "1.0.18"
 
 logger = None
 
@@ -86,12 +86,14 @@ class MainApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Excel to SQL Converter")
-        ico_path = resource_path("images/icon.ico")
         self.geometry("430x460")
         self.resizable(False, False)
         self.db_type = None
         self.icon_images = {}
         self.arrow_icon = None
+        ico_path = resource_path("images/icon.ico")
+        if os.path.exists(ico_path):
+            self.iconbitmap(ico_path)
         for dbname, filename in [
             ('oracle', 'oracle.png'),
             ('postgres', 'postgres.png'),
