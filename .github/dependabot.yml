@@ -32,7 +32,3 @@ updates:
     
     reviewers:
       - "Akr0n"
-    
-permissions:
-  pull-requests: write
-  contents: write
