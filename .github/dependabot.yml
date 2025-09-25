@@ -7,32 +7,11 @@ updates:
       day: "saturday"
       time: "09:30"
       timezone: "Europe/Rome"
-    
-    # Gruppi di aggiornamenti correlati
-    groups:
-      actions:
-        patterns:
-          - "actions/*"
-      
-    # Ignora alcune actions se necessario
-    ignore:
-      - dependency-name: "actions/checkout"
-        versions: ["v3"]
-        
-    # Auto-merge per patch/minor updates
-    auto-merge:
-      squash-merge: true
-    
     commit-message:
       prefix: "ci"
       include: "scope"
-    
-    pull-request-branch-name:
-      separator: "/"
-    
+    labels:
+      - "dependencies"
+      - "github-actions"
     reviewers:
       - "Akr0n"
-    
-permissions:
-  pull-requests: write
-  contents: write
