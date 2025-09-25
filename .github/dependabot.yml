@@ -1,0 +1,39 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "saturday"
+      time: "09:30"
+      timezone: "Europe/Rome"
+    
+    # Gruppi di aggiornamenti correlati
+    groups:
+      actions:
+        patterns:
+          - "actions/*"
+      
+    # Ignora alcune actions se necessario
+    ignore:
+      - dependency-name: "actions/checkout"
+        versions: ["v3"]
+        
+    # Auto-merge per patch/minor updates
+    auto-merge:
+      squash-merge: true
+    
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    
+    pull-request-branch-name:
+      separator: "/"
+    
+    reviewers:
+      - "Akr0n"
+    
+    labels:
+      - "dependencies"
+      - "ci/cd"
+      - "auto-merge"
