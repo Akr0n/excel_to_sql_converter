@@ -242,7 +242,7 @@ class MainApp(tk.Tk):
             messagebox.showwarning("Attenzione", "Completa tutti i campi obbligatori!")
             return
         result = convert_file(file_path, db_type, schema, table, database)
-        messagebox.showinfo("Risultato Conversione", result)
+        messagebox.showinfo("Risultato della Conversione", result)
 
 if __name__ == '__main__':
     app = MainApp()
