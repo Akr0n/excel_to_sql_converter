@@ -1,0 +1,6 @@
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "botlogics",
+        "projectKey": "botlogics_excel_to_sql_converter"
+    }
+}

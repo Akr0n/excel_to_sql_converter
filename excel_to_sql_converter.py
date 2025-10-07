@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import sys
 import logging
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -54,12 +55,87 @@ def format_insert(db_type, schema, table, df):
     logging.info(f"Generati {len(statements)} statements INSERT")
     return "\n".join(statements)
 
+def load_csv_robust(file_path):
+    """
+    Carica un file CSV provando automaticamente diverse combinazioni di separatori e codifiche.
+    Restituisce il DataFrame o solleva un'eccezione se tutti i tentativi falliscono.
+    """
+    # Combinazioni da provare: (separatore, codifica)
+    combinations = [
+        (',', 'utf-8'),          # Standard internazionale
+        (';', 'utf-8'),          # Standard europeo UTF-8
+        (',', 'latin-1'),        # Standard internazionale con codifica europea
+        (';', 'latin-1'),        # Standard europeo con codifica europea
+        (',', 'cp1252'),         # Windows encoding
+        (';', 'cp1252'),         # Windows encoding con punto e virgola
+        ('\t', 'utf-8'),         # Tab-separated UTF-8
+        ('\t', 'latin-1'),       # Tab-separated latin-1
+        ('|', 'utf-8'),          # Pipe-separated UTF-8
+        ('|', 'latin-1'),        # Pipe-separated latin-1
+    ]
+    
+    best_df = None
+    best_score = -1
+    best_combination = None
+    errors = []
+    
+    def score_dataframe(df):
+        # Heuristic scoring for DataFrame quality
+        num_cols = len(df.columns)
+        non_empty_rows = len(df.dropna(how='all'))
+        col_names = df.columns.tolist()
+        # Penalize if all columns are unnamed or empty
+        num_unnamed = sum(
+            (
+                (isinstance(col, str) and (col.startswith("Unnamed") or col.strip() == "")) or
+                not isinstance(col, str)
+            )
+            for col in col_names
+        )
+        unique_names = len(set(col_names))
+        # Penalize if all column names are the same
+        col_name_quality = (unique_names / num_cols) if num_cols > 0 else 0
+        # Penalize if most columns are unnamed
+        unnamed_penalty = num_unnamed / num_cols if num_cols > 0 else 1
+        # Data consistency: fraction of rows with at least half non-null columns
+        if num_cols > 0 and len(df) > 0:
+            sufficient_data_rows = (df.notnull().sum(axis=1) >= (num_cols // 2)).sum()
+            data_consistency = sufficient_data_rows / len(df)
+        else:
+            data_consistency = 0
+        # Final score: weighted sum
+        score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10 + data_consistency * 10 - unnamed_penalty * 5
+        return score, num_cols, non_empty_rows
+    
+    for sep, encoding in combinations:
+        try:
+            df = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str)
+            score, num_cols, non_empty_rows = score_dataframe(df)
+            logging.info(f"Tentativo {sep}|{encoding}: {num_cols} colonne, {non_empty_rows} righe con dati, score={score:.2f}")
+            if score > best_score:
+                best_df = df
+                best_score = score
+                best_combination = (sep, encoding)
+        except Exception as e:
+            errors.append(f"{sep}|{encoding}: {str(e)}")
+            continue
+    
+    if best_df is not None:
+        sep, encoding = best_combination
+        logging.info(f"CSV caricato con successo usando separatore '{sep}' e codifica '{encoding}'")
+        logging.info(f"Colonne rilevate: {list(best_df.columns)}")
+        return best_df
+    else:
+        error_msg = "Impossibile caricare il CSV con nessuna combinazione. Errori: " + "; ".join(errors)
+        logging.error(error_msg)
+        raise Exception(error_msg)
+
 def convert_file(file_path, db_type, schema, table, database=None):
     setup_logging(file_path)
     ext = os.path.splitext(file_path)[1].lower()
     try:
         if ext == '.csv':
-            df = pd.read_csv(file_path)
+            df = load_csv_robust(file_path)
         else:
             df = pd.read_excel(file_path)
         logging.info(f"Dati caricati correttamente da {file_path}")
