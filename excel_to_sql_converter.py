@@ -75,25 +75,43 @@ def load_csv_robust(file_path):
     ]
     
     best_df = None
-    best_cols = 0
+    best_score = -1
     best_combination = None
     errors = []
+    
+    def score_dataframe(df):
+        # Heuristic scoring for DataFrame quality
+        num_cols = len(df.columns)
+        non_empty_rows = len(df.dropna(how='all'))
+        col_names = df.columns.tolist()
+        # Penalize if all columns are unnamed or empty
+        num_unnamed = sum([str(col).startswith("Unnamed") or str(col).strip() == "" for col in col_names])
+        unique_names = len(set(col_names))
+        # Penalize if all column names are the same
+        col_name_quality = (unique_names / num_cols) if num_cols > 0 else 0
+        # Penalize if most columns are unnamed
+        unnamed_penalty = num_unnamed / num_cols if num_cols > 0 else 1
+        # Data consistency: fraction of rows with at least half non-null columns
+        if num_cols > 0 and len(df) > 0:
+            sufficient_data_rows = (df.notnull().sum(axis=1) >= (num_cols // 2)).sum()
+            data_consistency = sufficient_data_rows / len(df)
+        else:
+            data_consistency = 0
+        # Final score: weighted sum
+        score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10 + data_consistency * 10 - unnamed_penalty * 5
+        return score
     
     for sep, encoding in combinations:
         try:
             df = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str)
-            # Verifica qualità: numero di colonne e righe non vuote
+            score = score_dataframe(df)
             num_cols = len(df.columns)
             non_empty_rows = len(df.dropna(how='all'))
-            
-            logging.info(f"Tentativo {sep}|{encoding}: {num_cols} colonne, {non_empty_rows} righe con dati")
-            
-            # Considera migliore se ha più colonne (separazione migliore) e almeno 1 riga di dati
-            if num_cols > best_cols and non_empty_rows > 0:
+            logging.info(f"Tentativo {sep}|{encoding}: {num_cols} colonne, {non_empty_rows} righe con dati, score={score:.2f}")
+            if score > best_score:
                 best_df = df
-                best_cols = num_cols
+                best_score = score
                 best_combination = (sep, encoding)
-                
         except Exception as e:
             errors.append(f"{sep}|{encoding}: {str(e)}")
             continue
