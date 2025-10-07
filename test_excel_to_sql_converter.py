@@ -12,6 +12,7 @@ import pandas as pd
 import logging
 from unittest.mock import patch, MagicMock
 import sys
+import pytest
 
 # Importa le funzioni da testare
 from excel_to_sql_converter import (
@@ -237,10 +238,10 @@ class TestConvertFile(unittest.TestCase):
             self.assertIn("USE [TestDB]", sql_content)
             self.assertIn("GO", sql_content)
     
-        @patch('excel_to_sql_converter.setup_logging')
-        def test_convert_file_not_found(self, mock_setup_logging):
-            """Test gestione file non esistente"""
-            mock_setup_logging.return_value = "/fake/log/path.log"
+    @patch('excel_to_sql_converter.setup_logging')
+    def test_convert_file_not_found(self, mock_setup_logging):
+        """Test gestione file non esistente"""
+        mock_setup_logging.return_value = "/fake/log/path.log"
         result = convert_file("/path/non/esistente.csv", "postgres", "public", "test")
         
         self.assertTrue(
@@ -352,6 +353,30 @@ class TestIntegration(unittest.TestCase):
         # Verifica file di log creato
         log_path = os.path.join(self.temp_dir, "dipendenti_log.log")
         self.assertTrue(os.path.exists(log_path))
+
+
+def create_large_csv(path, rows=500000, cols=10):
+    import csv
+    with open(path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow([f'col{i}' for i in range(cols)])
+        for r in range(rows):
+            writer.writerow([f'data_{r}_{c}' for c in range(cols)])
+
+@pytest.mark.slow
+def test_convert_large_csv(tmp_path):
+    csv_path = tmp_path / 'large.csv'
+    create_large_csv(str(csv_path), rows=500000, cols=10)
+    result = convert_file(str(csv_path), 'postgres', 'public', 'test_table')
+    assert 'OK' in result
+    assert 'Generato' in result
+    assert 'Righe' in result
+    out_sql = str(csv_path).replace('.csv', '.sql')
+    assert os.path.exists(out_sql)
+    # Controlla che il file SQL sia stato creato e abbia dimensione > 0
+    assert os.path.getsize(out_sql) > 0
+    # Cleanup
+    os.remove(out_sql)
 
 
 if __name__ == '__main__':

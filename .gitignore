@@ -40,9 +40,6 @@ htmlcov/
 *.test.csv
 *.test.xlsx
 
-# Large test files
-test_large_csv.py
-
 # Misc
 *.db
 *.sqlite
