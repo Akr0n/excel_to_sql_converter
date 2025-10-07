@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import sys
 import logging
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -54,12 +55,65 @@ def format_insert(db_type, schema, table, df):
     logging.info(f"Generati {len(statements)} statements INSERT")
     return "\n".join(statements)
 
+def load_csv_robust(file_path):
+    """
+    Carica un file CSV provando automaticamente diverse combinazioni di separatori e codifiche.
+    Restituisce il DataFrame o solleva un'eccezione se tutti i tentativi falliscono.
+    """
+    # Combinazioni da provare: (separatore, codifica)
+    combinations = [
+        (',', 'utf-8'),          # Standard internazionale
+        (';', 'utf-8'),          # Standard europeo UTF-8
+        (',', 'latin-1'),        # Standard internazionale con codifica europea
+        (';', 'latin-1'),        # Standard europeo con codifica europea
+        (',', 'cp1252'),         # Windows encoding
+        (';', 'cp1252'),         # Windows encoding con punto e virgola
+        ('\t', 'utf-8'),         # Tab-separated UTF-8
+        ('\t', 'latin-1'),       # Tab-separated latin-1
+        ('|', 'utf-8'),          # Pipe-separated UTF-8
+        ('|', 'latin-1'),        # Pipe-separated latin-1
+    ]
+    
+    best_df = None
+    best_cols = 0
+    best_combination = None
+    errors = []
+    
+    for sep, encoding in combinations:
+        try:
+            df = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str)
+            # Verifica qualità: numero di colonne e righe non vuote
+            num_cols = len(df.columns)
+            non_empty_rows = len(df.dropna(how='all'))
+            
+            logging.info(f"Tentativo {sep}|{encoding}: {num_cols} colonne, {non_empty_rows} righe con dati")
+            
+            # Considera migliore se ha più colonne (separazione migliore) e almeno 1 riga di dati
+            if num_cols > best_cols and non_empty_rows > 0:
+                best_df = df
+                best_cols = num_cols
+                best_combination = (sep, encoding)
+                
+        except Exception as e:
+            errors.append(f"{sep}|{encoding}: {str(e)}")
+            continue
+    
+    if best_df is not None:
+        sep, encoding = best_combination
+        logging.info(f"CSV caricato con successo usando separatore '{sep}' e codifica '{encoding}'")
+        logging.info(f"Colonne rilevate: {list(best_df.columns)}")
+        return best_df
+    else:
+        error_msg = "Impossibile caricare il CSV con nessuna combinazione. Errori: " + "; ".join(errors)
+        logging.error(error_msg)
+        raise Exception(error_msg)
+
 def convert_file(file_path, db_type, schema, table, database=None):
     setup_logging(file_path)
     ext = os.path.splitext(file_path)[1].lower()
     try:
         if ext == '.csv':
-            df = pd.read_csv(file_path)
+            df = load_csv_robust(file_path)
         else:
             df = pd.read_excel(file_path)
         logging.info(f"Dati caricati correttamente da {file_path}")
