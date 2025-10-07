@@ -1,24 +1,54 @@
-# Eclipse
-.classpath
-.project
-.settings/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
 
-# Maven
-log/
-target/
-.mvn
+# Virtualenv
+.venv/
+venv/
+ENV/
 
-#compressed
-*.zip
-#*.bin
-#*.war
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
 
-#paths
-build/*
-dist/*
-test/*
+# OS
+.DS_Store
+Thumbs.db
 
-#other
-*.log
+# Build
+/dist/
+/build/
+*.egg-info/
 *.spec
+
+# Output
+*.log
 *.sql
+output_inserts.sql
+coverage.xml
+htmlcov/
+
+# Test
+*.tmp
+*.bak
+*.test.csv
+*.test.xlsx
+
+# Misc
+*.db
+*.sqlite
+
+# Images (keep only source)
+images/*.png
+images/*.ico
+!images/
+
+# Exclude test artifacts
+test_*.csv
+test_*.sql
