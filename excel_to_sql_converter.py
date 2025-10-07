@@ -9,7 +9,14 @@ from PIL import Image, ImageTk
 #versione corrente
 APP_VERSION = "1.0.22"
 
+# Costanti UI
+DEFAULT_FONT_FAMILY = "Segoe UI"
+
 logger = None
+
+class CSVLoadError(Exception):
+    """Eccezione personalizzata per errori di caricamento CSV"""
+    pass
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -48,7 +55,7 @@ def format_insert(db_type, schema, table, df):
             if pd.isnull(val):
                 values.append("NULL")
             else:
-                values.append(f"'{str(val).replace("'", "''")}'")
+                values.append(f"'{str(val).replace(chr(39), chr(39)*2)}'")
         cols = ", ".join([f'"{col}"' for col in columns]) if db_type == 'postgres' else ", ".join(columns)
         vals = ", ".join(values)
         statements.append(f'INSERT INTO [{schema}].[{table}] ({cols}) VALUES ({vals});')
@@ -75,25 +82,56 @@ def load_csv_robust(file_path):
     ]
     
     best_df = None
-    best_cols = 0
+    best_score = -1
     best_combination = None
     errors = []
     
+    def score_dataframe(df):
+        # Heuristic scoring for DataFrame quality
+        num_cols = len(df.columns)
+        non_empty_rows = len(df.dropna(how='all'))
+        col_names = df.columns.tolist()
+        # Penalize if all columns are unnamed or empty
+        num_unnamed = sum(
+            (
+                (isinstance(col, str) and (col.startswith("Unnamed") or col.strip() == "")) or
+                not isinstance(col, str)
+            )
+            for col in col_names
+        )
+        unique_names = len(set(col_names))
+        # Penalize if all column names are the same
+        col_name_quality = (unique_names / num_cols) if num_cols > 0 else 0
+        # Penalize if most columns are unnamed
+        unnamed_penalty = num_unnamed / num_cols if num_cols > 0 else 1
+        # Data consistency: fraction of rows with at least half non-null columns
+        if num_cols > 0 and len(df) > 0:
+            sufficient_data_rows = (df.notnull().sum(axis=1) >= (num_cols // 2)).sum()
+            data_consistency = sufficient_data_rows / len(df)
+        else:
+            data_consistency = 0
+        # Final score: weighted sum
+        score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10 + data_consistency * 10 - unnamed_penalty * 5
+        return score, num_cols, non_empty_rows
+    
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if file_size_mb > 100:
+        logging.warning(f"File molto grande: {file_size_mb:.1f} MB. Potrebbero verificarsi problemi di memoria.")
+    chunking = file_size_mb > 10
     for sep, encoding in combinations:
         try:
-            df = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str)
-            # Verifica qualità: numero di colonne e righe non vuote
-            num_cols = len(df.columns)
-            non_empty_rows = len(df.dropna(how='all'))
-            
-            logging.info(f"Tentativo {sep}|{encoding}: {num_cols} colonne, {non_empty_rows} righe con dati")
-            
-            # Considera migliore se ha più colonne (separazione migliore) e almeno 1 riga di dati
-            if num_cols > best_cols and non_empty_rows > 0:
+            if chunking:
+                # Carica solo il primo chunk per scoring
+                chunk_iter = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str, chunksize=100000)
+                df = next(chunk_iter)
+            else:
+                df = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str)
+            score, num_cols, non_empty_rows = score_dataframe(df)
+            logging.info(f"Tentativo {sep}|{encoding}: {num_cols} colonne, {non_empty_rows} righe con dati, score={score:.2f}")
+            if score > best_score:
                 best_df = df
-                best_cols = num_cols
+                best_score = score
                 best_combination = (sep, encoding)
-                
         except Exception as e:
             errors.append(f"{sep}|{encoding}: {str(e)}")
             continue
@@ -102,39 +140,83 @@ def load_csv_robust(file_path):
         sep, encoding = best_combination
         logging.info(f"CSV caricato con successo usando separatore '{sep}' e codifica '{encoding}'")
         logging.info(f"Colonne rilevate: {list(best_df.columns)}")
+        # Validazione aggiuntiva: se il DataFrame ha una sola colonna e nessuna riga utile, probabilmente il file è corrotto o non valido
+        num_cols = len(best_df.columns)
+        non_empty_rows = len(best_df.dropna(how='all'))
+        if num_cols <= 1 or non_empty_rows == 0:
+            error_msg = (f"CSV caricato ma sospetto: {num_cols} colonne, {non_empty_rows} righe con dati. "
+                         f"Probabile file non valido o corrotto.")
+            logging.error(error_msg)
+            raise CSVLoadError(error_msg)
         return best_df
     else:
         error_msg = "Impossibile caricare il CSV con nessuna combinazione. Errori: " + "; ".join(errors)
         logging.error(error_msg)
-        raise Exception(error_msg)
+        raise CSVLoadError(error_msg)
 
 def convert_file(file_path, db_type, schema, table, database=None):
     setup_logging(file_path)
     ext = os.path.splitext(file_path)[1].lower()
     try:
+        ext = os.path.splitext(file_path)[1].lower()
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        chunking = ext == '.csv' and file_size_mb > 10
         if ext == '.csv':
-            df = load_csv_robust(file_path)
+            if not chunking:
+                df = load_csv_robust(file_path)
+            else:
+                # Determina separatore/codifica migliore usando load_csv_robust (primo chunk)
+                combinations = [(',', 'utf-8'), (';', 'utf-8'), (',', 'latin-1'), (';', 'latin-1'), (',', 'cp1252'), (';', 'cp1252'), ('\t', 'utf-8'), ('\t', 'latin-1'), ('|', 'utf-8'), ('|', 'latin-1')]
+                best_sep, best_enc = None, None
+                best_score = -1
+                for sep, encoding in combinations:
+                    try:
+                        chunk_iter = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str, chunksize=100000)
+                        df_chunk = next(chunk_iter)
+                        num_cols = len(df_chunk.columns)
+                        non_empty_rows = len(df_chunk.dropna(how='all'))
+                        unique_names = len(set(df_chunk.columns.tolist()))
+                        col_name_quality = (unique_names / num_cols) if num_cols > 0 else 0
+                        score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10
+                        if score > best_score:
+                            best_score = score
+                            best_sep, best_enc = sep, encoding
+                    except Exception:
+                        continue
+                if best_sep is None:
+                    raise CSVLoadError("Impossibile determinare separatore/codifica per file grande.")
+                base = os.path.splitext(os.path.basename(file_path))[0]
+                dir_path = os.path.dirname(file_path)
+                out_file = os.path.join(dir_path, f"{base}.sql")
+                with open(out_file, "w", encoding="utf-8") as f:
+                    if db_type == "sqlserver" and database:
+                        f.write(f"USE [{database}]\nGO\n\n")
+                    f.write(f"DELETE FROM [{schema}].[{table}];\nGO\n\n")
+                    chunk_iter = pd.read_csv(file_path, sep=best_sep, encoding=best_enc, dtype=str, chunksize=100000)
+                    total_rows = 0
+                    for chunk in chunk_iter:
+                        sql_insert = format_insert(db_type, schema, table, chunk)
+                        f.write(sql_insert + "\n")
+                        total_rows += len(chunk)
+                logging.info(f"Conversione terminata correttamente. File SQL generato: {out_file}. Righe totali: {total_rows}")
+                return f"{os.path.basename(file_path)} -> OK (Generato: {out_file}, Righe: {total_rows})"
         else:
             df = pd.read_excel(file_path)
-        logging.info(f"Dati caricati correttamente da {file_path}")
+        if not chunking:
+            sql_insert = format_insert(db_type, schema, table, df)
+            base = os.path.splitext(os.path.basename(file_path))[0]
+            dir_path = os.path.dirname(file_path)
+            out_file = os.path.join(dir_path, f"{base}.sql")
+            with open(out_file, "w", encoding="utf-8") as f:
+                if db_type == "sqlserver" and database:
+                    f.write(f"USE [{database}]\nGO\n\n")
+                f.write(f"DELETE FROM [{schema}].[{table}];\nGO\n\n")
+                f.write(sql_insert)
+            logging.info(f"Conversione terminata correttamente. File SQL generato: {out_file}")
+            return f"{os.path.basename(file_path)} -> OK (Generato: {out_file})"
     except Exception as e:
-        logging.error(f"Errore nel caricamento dati: {e}")
-        return f"{os.path.basename(file_path)} -> Errore nel caricamento dati: {e}"
-    try:
-        sql_insert = format_insert(db_type, schema, table, df)
-        base = os.path.splitext(os.path.basename(file_path))[0]
-        dir_path = os.path.dirname(file_path)
-        out_file = os.path.join(dir_path, f"{base}.sql")
-        with open(out_file, "w", encoding="utf-8") as f:
-            if db_type == "sqlserver" and database:
-                f.write(f"USE [{database}]\nGO\n\n")
-            f.write(f"DELETE FROM [{schema}].[{table}];\nGO\n\n")
-            f.write(sql_insert)
-        logging.info(f"Conversione terminata correttamente. File SQL generato: {out_file}")
-        return f"{os.path.basename(file_path)} -> OK (Generato: {out_file})"
-    except Exception as e:
-        logging.error(f"Errore conversione: {e}")
-        return f"{os.path.basename(file_path)} -> Errore conversione: {e}"
+        logging.error(f"Errore nel caricamento/conversione dati: {e}")
+        return f"{os.path.basename(file_path)} -> Errore nel caricamento/conversione dati: {e}"
 
 class MainApp(tk.Tk):
     def __init__(self):
@@ -180,7 +262,7 @@ class MainApp(tk.Tk):
         self.version_label = tk.Label(
             self,
             text=f"Versione: {APP_VERSION}",
-            font=("Segoe UI", 8),
+            font=(DEFAULT_FONT_FAMILY, 8),
             fg="grey",
             anchor="se"
         )
@@ -188,14 +270,14 @@ class MainApp(tk.Tk):
 
     def show_db_menu(self):
         self.clean_widgets()
-        title = tk.Label(self, text="Scegli il database di destinazione:", font=("Segoe UI", 12, 'bold'))
+        title = tk.Label(self, text="Scegli il database di destinazione:", font=(DEFAULT_FONT_FAMILY, 12, 'bold'))
         title.pack(pady=18)
         frame = tk.Frame(self)
         frame.pack(pady=8)
         btn_oracle = tk.Button(
             frame,
             text=" Oracle",
-            font=("Segoe UI", 12, 'bold'),
+            font=(DEFAULT_FONT_FAMILY, 12, 'bold'),
             compound="left",
             image=self.icon_images.get('oracle'),
             width=130, height=38,
@@ -207,7 +289,7 @@ class MainApp(tk.Tk):
         btn_postgres = tk.Button(
             frame,
             text=" Postgres",
-            font=("Segoe UI", 12, 'bold'),
+            font=(DEFAULT_FONT_FAMILY, 12, 'bold'),
             compound="left",
             image=self.icon_images.get('postgres'),
             width=130, height=38,
@@ -219,7 +301,7 @@ class MainApp(tk.Tk):
         btn_sqlserver = tk.Button(
             frame,
             text=" SQL Server",
-            font=("Segoe UI", 12, 'bold'),
+            font=(DEFAULT_FONT_FAMILY, 12, 'bold'),
             compound="left",
             image=self.icon_images.get('sqlserver'),
             width=130, height=38,
@@ -235,7 +317,7 @@ class MainApp(tk.Tk):
         back_btn = tk.Button(
             self,
             text=" Indietro",
-            font=("Segoe UI", 10), width=90, height=38,
+            font=(DEFAULT_FONT_FAMILY, 10), width=90, height=38,
             compound="left", image=self.arrow_icon,
             padx=12,
             anchor="center",
@@ -247,32 +329,32 @@ class MainApp(tk.Tk):
         center_frame.place(relx=0.5, rely=0.13, anchor="n")
         spacing = 13
 
-        file_label = tk.Label(center_frame, text="File Excel:", font=("Segoe UI", 10))
+        file_label = tk.Label(center_frame, text="File Excel:", font=(DEFAULT_FONT_FAMILY, 10))
         file_label.pack(pady=(6,2))
-        self.file_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.file_entry = tk.Entry(center_frame, width=36, font=(DEFAULT_FONT_FAMILY, 10), justify="center")
         self.file_entry.pack(pady=(0,spacing))
         browse_btn = tk.Button(center_frame, text="Sfoglia", width=16, command=self.browse_file)
         browse_btn.pack(pady=(0,spacing))
 
-        schema_label = tk.Label(center_frame, text="Schema:", font=("Segoe UI", 10))
+        schema_label = tk.Label(center_frame, text="Schema:", font=(DEFAULT_FONT_FAMILY, 10))
         schema_label.pack(pady=(2,2))
-        self.schema_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.schema_entry = tk.Entry(center_frame, width=36, font=(DEFAULT_FONT_FAMILY, 10), justify="center")
         self.schema_entry.pack(pady=(0,spacing))
 
-        table_label = tk.Label(center_frame, text="Tabella:", font=("Segoe UI", 10))
+        table_label = tk.Label(center_frame, text="Tabella:", font=(DEFAULT_FONT_FAMILY, 10))
         table_label.pack(pady=(2,2))
-        self.table_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.table_entry = tk.Entry(center_frame, width=36, font=(DEFAULT_FONT_FAMILY, 10), justify="center")
         self.table_entry.pack(pady=(0,spacing))
 
         if db_type == "sqlserver":
-            db_label = tk.Label(center_frame, text="Database:", font=("Segoe UI", 10))
+            db_label = tk.Label(center_frame, text="Database:", font=(DEFAULT_FONT_FAMILY, 10))
             db_label.pack(pady=(2,2))
-            self.db_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+            self.db_entry = tk.Entry(center_frame, width=36, font=(DEFAULT_FONT_FAMILY, 10), justify="center")
             self.db_entry.pack(pady=(0,spacing))
         else:
             self.db_entry = None
 
-        convert_btn = tk.Button(center_frame, text="Converti", font=("Segoe UI", 10), width=23, command=self.start_conversion)
+        convert_btn = tk.Button(center_frame, text="Converti", font=(DEFAULT_FONT_FAMILY, 10), width=23, command=self.start_conversion)
         convert_btn.pack(pady=(2,18))
 
     def browse_file(self):
