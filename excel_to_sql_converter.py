@@ -86,8 +86,10 @@ def load_csv_robust(file_path):
         col_names = df.columns.tolist()
         # Penalize if all columns are unnamed or empty
         num_unnamed = sum(
-            (col.startswith("Unnamed") if isinstance(col, str) else True) or
-            (col.strip() == "" if isinstance(col, str) else True)
+            (
+                (isinstance(col, str) and (col.startswith("Unnamed") or col.strip() == "")) or
+                not isinstance(col, str)
+            )
             for col in col_names
         )
         unique_names = len(set(col_names))
