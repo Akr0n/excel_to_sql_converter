@@ -9,7 +9,14 @@ from PIL import Image, ImageTk
 #versione corrente
 APP_VERSION = "1.0.22"
 
+# Costanti UI
+DEFAULT_FONT_FAMILY = "Segoe UI"
+
 logger = None
+
+class CSVLoadError(Exception):
+    """Eccezione personalizzata per errori di caricamento CSV"""
+    pass
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and for PyInstaller """
@@ -106,7 +113,7 @@ def load_csv_robust(file_path):
     else:
         error_msg = "Impossibile caricare il CSV con nessuna combinazione. Errori: " + "; ".join(errors)
         logging.error(error_msg)
-        raise Exception(error_msg)
+        raise CSVLoadError(error_msg)
 
 def convert_file(file_path, db_type, schema, table, database=None):
     setup_logging(file_path)
@@ -180,7 +187,7 @@ class MainApp(tk.Tk):
         self.version_label = tk.Label(
             self,
             text=f"Versione: {APP_VERSION}",
-            font=("Segoe UI", 8),
+            font=(DEFAULT_FONT_FAMILY, 8),
             fg="grey",
             anchor="se"
         )
@@ -188,14 +195,14 @@ class MainApp(tk.Tk):
 
     def show_db_menu(self):
         self.clean_widgets()
-        title = tk.Label(self, text="Scegli il database di destinazione:", font=("Segoe UI", 12, 'bold'))
+        title = tk.Label(self, text="Scegli il database di destinazione:", font=(DEFAULT_FONT_FAMILY, 12, 'bold'))
         title.pack(pady=18)
         frame = tk.Frame(self)
         frame.pack(pady=8)
         btn_oracle = tk.Button(
             frame,
             text=" Oracle",
-            font=("Segoe UI", 12, 'bold'),
+            font=(DEFAULT_FONT_FAMILY, 12, 'bold'),
             compound="left",
             image=self.icon_images.get('oracle'),
             width=130, height=38,
@@ -207,7 +214,7 @@ class MainApp(tk.Tk):
         btn_postgres = tk.Button(
             frame,
             text=" Postgres",
-            font=("Segoe UI", 12, 'bold'),
+            font=(DEFAULT_FONT_FAMILY, 12, 'bold'),
             compound="left",
             image=self.icon_images.get('postgres'),
             width=130, height=38,
@@ -219,7 +226,7 @@ class MainApp(tk.Tk):
         btn_sqlserver = tk.Button(
             frame,
             text=" SQL Server",
-            font=("Segoe UI", 12, 'bold'),
+            font=(DEFAULT_FONT_FAMILY, 12, 'bold'),
             compound="left",
             image=self.icon_images.get('sqlserver'),
             width=130, height=38,
@@ -235,7 +242,7 @@ class MainApp(tk.Tk):
         back_btn = tk.Button(
             self,
             text=" Indietro",
-            font=("Segoe UI", 10), width=90, height=38,
+            font=(DEFAULT_FONT_FAMILY, 10), width=90, height=38,
             compound="left", image=self.arrow_icon,
             padx=12,
             anchor="center",
@@ -247,32 +254,32 @@ class MainApp(tk.Tk):
         center_frame.place(relx=0.5, rely=0.13, anchor="n")
         spacing = 13
 
-        file_label = tk.Label(center_frame, text="File Excel:", font=("Segoe UI", 10))
+        file_label = tk.Label(center_frame, text="File Excel:", font=(DEFAULT_FONT_FAMILY, 10))
         file_label.pack(pady=(6,2))
-        self.file_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.file_entry = tk.Entry(center_frame, width=36, font=(DEFAULT_FONT_FAMILY, 10), justify="center")
         self.file_entry.pack(pady=(0,spacing))
         browse_btn = tk.Button(center_frame, text="Sfoglia", width=16, command=self.browse_file)
         browse_btn.pack(pady=(0,spacing))
 
-        schema_label = tk.Label(center_frame, text="Schema:", font=("Segoe UI", 10))
+        schema_label = tk.Label(center_frame, text="Schema:", font=(DEFAULT_FONT_FAMILY, 10))
         schema_label.pack(pady=(2,2))
-        self.schema_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.schema_entry = tk.Entry(center_frame, width=36, font=(DEFAULT_FONT_FAMILY, 10), justify="center")
         self.schema_entry.pack(pady=(0,spacing))
 
-        table_label = tk.Label(center_frame, text="Tabella:", font=("Segoe UI", 10))
+        table_label = tk.Label(center_frame, text="Tabella:", font=(DEFAULT_FONT_FAMILY, 10))
         table_label.pack(pady=(2,2))
-        self.table_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+        self.table_entry = tk.Entry(center_frame, width=36, font=(DEFAULT_FONT_FAMILY, 10), justify="center")
         self.table_entry.pack(pady=(0,spacing))
 
         if db_type == "sqlserver":
-            db_label = tk.Label(center_frame, text="Database:", font=("Segoe UI", 10))
+            db_label = tk.Label(center_frame, text="Database:", font=(DEFAULT_FONT_FAMILY, 10))
             db_label.pack(pady=(2,2))
-            self.db_entry = tk.Entry(center_frame, width=36, font=("Segoe UI", 10), justify="center")
+            self.db_entry = tk.Entry(center_frame, width=36, font=(DEFAULT_FONT_FAMILY, 10), justify="center")
             self.db_entry.pack(pady=(0,spacing))
         else:
             self.db_entry = None
 
-        convert_btn = tk.Button(center_frame, text="Converti", font=("Segoe UI", 10), width=23, command=self.start_conversion)
+        convert_btn = tk.Button(center_frame, text="Converti", font=(DEFAULT_FONT_FAMILY, 10), width=23, command=self.start_conversion)
         convert_btn.pack(pady=(2,18))
 
     def browse_file(self):

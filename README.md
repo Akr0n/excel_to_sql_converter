@@ -34,3 +34,38 @@ L’obiettivo del progetto è offrire uno strumento semplice, leggero e facilmen
 5. Seleziona "Converti" e attendi la fine del processo. Il tempo d'attesa varia a seconda della grandezza del file.
 
 6. Il file .sql verrà salvato, insieme al log di esecuzione, nella stessa cartella del file originale.
+---
+
+## Testing e Sviluppo
+
+Il progetto include una suite completa di test automatici per garantire qualità e stabilità del codice.
+
+### Esecuzione Test
+
+**Opzione 1: Script automatico**
+```bash
+./run_tests.bat
+```
+
+**Opzione 2: Comando manuale**
+```bash
+pip install -r requirements-dev.txt
+python -m pytest test_excel_to_sql_converter.py -v
+```
+
+**Opzione 3: Con coverage report**
+```bash
+python -m pytest test_excel_to_sql_converter.py -v --cov=excel_to_sql_converter --cov-report=html
+```
+
+### Test Inclusi
+
+- **Test CSV Loading**: Verifica caricamento robusto CSV con diversi separatori e codifiche
+- **Test SQL Formatting**: Controllo generazione SQL per PostgreSQL, SQL Server e Oracle  
+- **Test Conversione File**: Test end-to-end del processo di conversione
+- **Test Logging**: Verifica corretta creazione e configurazione dei log
+- **Test Integrazione**: Workflow completo CSV → SQL con dati realistici
+
+### Continuous Integration
+
+I test vengono eseguiti automaticamente su GitHub Actions per ogni push e pull request su Python 3.9-3.13.
