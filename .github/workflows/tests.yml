@@ -34,7 +34,7 @@ jobs:
 
     - name: Run tests with pytest
       run: |
-        python -m pytest test_excel_to_sql_converter.py -v --cov=excel_to_sql_converter --cov-report=xml --cov-report=html
+        python -m pytest test_excel_to_sql_converter.py test_large_csv.py -v --cov=excel_to_sql_converter --cov-report=xml --cov-report=html
 
     - name: Upload coverage reports
       if: matrix.python-version == '3.11'  # Carica coverage solo per una versione
