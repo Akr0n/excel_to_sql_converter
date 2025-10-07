@@ -131,6 +131,14 @@ def load_csv_robust(file_path):
         sep, encoding = best_combination
         logging.info(f"CSV caricato con successo usando separatore '{sep}' e codifica '{encoding}'")
         logging.info(f"Colonne rilevate: {list(best_df.columns)}")
+        # Validazione aggiuntiva: se il DataFrame ha una sola colonna e nessuna riga utile, probabilmente il file è corrotto o non valido
+        num_cols = len(best_df.columns)
+        non_empty_rows = len(best_df.dropna(how='all'))
+        if num_cols <= 1 or non_empty_rows == 0:
+            error_msg = (f"CSV caricato ma sospetto: {num_cols} colonne, {non_empty_rows} righe con dati. "
+                         f"Probabile file non valido o corrotto.")
+            logging.error(error_msg)
+            raise CSVLoadError(error_msg)
         return best_df
     else:
         error_msg = "Impossibile caricare il CSV con nessuna combinazione. Errori: " + "; ".join(errors)
