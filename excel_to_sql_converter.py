@@ -105,14 +105,12 @@ def load_csv_robust(file_path):
             data_consistency = 0
         # Final score: weighted sum
         score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10 + data_consistency * 10 - unnamed_penalty * 5
-        return score
+        return score, num_cols, non_empty_rows
     
     for sep, encoding in combinations:
         try:
             df = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str)
-            score = score_dataframe(df)
-            num_cols = len(df.columns)
-            non_empty_rows = len(df.dropna(how='all'))
+            score, num_cols, non_empty_rows = score_dataframe(df)
             logging.info(f"Tentativo {sep}|{encoding}: {num_cols} colonne, {non_empty_rows} righe con dati, score={score:.2f}")
             if score > best_score:
                 best_df = df
