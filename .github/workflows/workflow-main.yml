@@ -13,6 +13,11 @@ jobs:
   release-job:
     runs-on: windows-latest        
     steps:
+      - name: Check Python version
+        run: |
+          python --version
+          where python
+          
       - name: Checkout code
         uses: actions/checkout@v4
         with:
