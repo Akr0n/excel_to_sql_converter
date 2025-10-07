@@ -243,7 +243,9 @@ class TestConvertFile(unittest.TestCase):
             mock_setup_logging.return_value = "/fake/log/path.log"
         result = convert_file("/path/non/esistente.csv", "postgres", "public", "test")
         
-        self.assertIn("Errore nel caricamento dati", result)
+        self.assertTrue(
+            "Errore nel caricamento/conversione dati" in result or "Errore nel caricamento dati" in result
+        )
     
     @patch('excel_to_sql_converter.load_csv_robust')
     def test_convert_csv_load_error(self, mock_load_csv):
@@ -253,7 +255,9 @@ class TestConvertFile(unittest.TestCase):
         csv_path = self.create_test_file("invalid", "test.csv")
         result = convert_file(csv_path, "postgres", "public", "test")
         
-        self.assertIn("Errore nel caricamento dati", result)
+        self.assertTrue(
+            "Errore nel caricamento/conversione dati" in result or "Errore nel caricamento dati" in result
+        )
         self.assertIn("Errore test", result)
 
 

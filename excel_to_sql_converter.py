@@ -114,9 +114,18 @@ def load_csv_robust(file_path):
         score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10 + data_consistency * 10 - unnamed_penalty * 5
         return score, num_cols, non_empty_rows
     
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if file_size_mb > 100:
+        logging.warning(f"File molto grande: {file_size_mb:.1f} MB. Potrebbero verificarsi problemi di memoria.")
+    chunking = file_size_mb > 10
     for sep, encoding in combinations:
         try:
-            df = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str)
+            if chunking:
+                # Carica solo il primo chunk per scoring
+                chunk_iter = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str, chunksize=100000)
+                df = next(chunk_iter)
+            else:
+                df = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str)
             score, num_cols, non_empty_rows = score_dataframe(df)
             logging.info(f"Tentativo {sep}|{encoding}: {num_cols} colonne, {non_empty_rows} righe con dati, score={score:.2f}")
             if score > best_score:
@@ -149,29 +158,65 @@ def convert_file(file_path, db_type, schema, table, database=None):
     setup_logging(file_path)
     ext = os.path.splitext(file_path)[1].lower()
     try:
+        ext = os.path.splitext(file_path)[1].lower()
+        file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+        chunking = ext == '.csv' and file_size_mb > 10
         if ext == '.csv':
-            df = load_csv_robust(file_path)
+            if not chunking:
+                df = load_csv_robust(file_path)
+            else:
+                # Determina separatore/codifica migliore usando load_csv_robust (primo chunk)
+                combinations = [(',', 'utf-8'), (';', 'utf-8'), (',', 'latin-1'), (';', 'latin-1'), (',', 'cp1252'), (';', 'cp1252'), ('\t', 'utf-8'), ('\t', 'latin-1'), ('|', 'utf-8'), ('|', 'latin-1')]
+                best_sep, best_enc = None, None
+                best_score = -1
+                for sep, encoding in combinations:
+                    try:
+                        chunk_iter = pd.read_csv(file_path, sep=sep, encoding=encoding, dtype=str, chunksize=100000)
+                        df_chunk = next(chunk_iter)
+                        num_cols = len(df_chunk.columns)
+                        non_empty_rows = len(df_chunk.dropna(how='all'))
+                        unique_names = len(set(df_chunk.columns.tolist()))
+                        col_name_quality = (unique_names / num_cols) if num_cols > 0 else 0
+                        score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10
+                        if score > best_score:
+                            best_score = score
+                            best_sep, best_enc = sep, encoding
+                    except Exception:
+                        continue
+                if best_sep is None:
+                    raise CSVLoadError("Impossibile determinare separatore/codifica per file grande.")
+                base = os.path.splitext(os.path.basename(file_path))[0]
+                dir_path = os.path.dirname(file_path)
+                out_file = os.path.join(dir_path, f"{base}.sql")
+                with open(out_file, "w", encoding="utf-8") as f:
+                    if db_type == "sqlserver" and database:
+                        f.write(f"USE [{database}]\nGO\n\n")
+                    f.write(f"DELETE FROM [{schema}].[{table}];\nGO\n\n")
+                    chunk_iter = pd.read_csv(file_path, sep=best_sep, encoding=best_enc, dtype=str, chunksize=100000)
+                    total_rows = 0
+                    for chunk in chunk_iter:
+                        sql_insert = format_insert(db_type, schema, table, chunk)
+                        f.write(sql_insert + "\n")
+                        total_rows += len(chunk)
+                logging.info(f"Conversione terminata correttamente. File SQL generato: {out_file}. Righe totali: {total_rows}")
+                return f"{os.path.basename(file_path)} -> OK (Generato: {out_file}, Righe: {total_rows})"
         else:
             df = pd.read_excel(file_path)
-        logging.info(f"Dati caricati correttamente da {file_path}")
+        if not chunking:
+            sql_insert = format_insert(db_type, schema, table, df)
+            base = os.path.splitext(os.path.basename(file_path))[0]
+            dir_path = os.path.dirname(file_path)
+            out_file = os.path.join(dir_path, f"{base}.sql")
+            with open(out_file, "w", encoding="utf-8") as f:
+                if db_type == "sqlserver" and database:
+                    f.write(f"USE [{database}]\nGO\n\n")
+                f.write(f"DELETE FROM [{schema}].[{table}];\nGO\n\n")
+                f.write(sql_insert)
+            logging.info(f"Conversione terminata correttamente. File SQL generato: {out_file}")
+            return f"{os.path.basename(file_path)} -> OK (Generato: {out_file})"
     except Exception as e:
-        logging.error(f"Errore nel caricamento dati: {e}")
-        return f"{os.path.basename(file_path)} -> Errore nel caricamento dati: {e}"
-    try:
-        sql_insert = format_insert(db_type, schema, table, df)
-        base = os.path.splitext(os.path.basename(file_path))[0]
-        dir_path = os.path.dirname(file_path)
-        out_file = os.path.join(dir_path, f"{base}.sql")
-        with open(out_file, "w", encoding="utf-8") as f:
-            if db_type == "sqlserver" and database:
-                f.write(f"USE [{database}]\nGO\n\n")
-            f.write(f"DELETE FROM [{schema}].[{table}];\nGO\n\n")
-            f.write(sql_insert)
-        logging.info(f"Conversione terminata correttamente. File SQL generato: {out_file}")
-        return f"{os.path.basename(file_path)} -> OK (Generato: {out_file})"
-    except Exception as e:
-        logging.error(f"Errore conversione: {e}")
-        return f"{os.path.basename(file_path)} -> Errore conversione: {e}"
+        logging.error(f"Errore nel caricamento/conversione dati: {e}")
+        return f"{os.path.basename(file_path)} -> Errore nel caricamento/conversione dati: {e}"
 
 class MainApp(tk.Tk):
     def __init__(self):
