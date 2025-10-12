@@ -7,7 +7,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 
 #versione corrente
-APP_VERSION = "1.0.22"
+APP_VERSION = "1.0.44"
 
 # Costanti UI
 DEFAULT_FONT_FAMILY = "Segoe UI"
@@ -69,6 +69,9 @@ def load_csv_robust(file_path):
     """
     # Combinazioni da provare: (separatore, codifica)
     combinations = [
+        (';', 'utf-16'),         # SQL Server export (UTF-16 con BOM)
+        (';', 'utf-16le'),       # UTF-16 Little Endian
+        (';', 'utf-16be'),       # UTF-16 Big Endian
         (',', 'utf-8'),          # Standard internazionale
         (';', 'utf-8'),          # Standard europeo UTF-8
         (',', 'latin-1'),        # Standard internazionale con codifica europea
@@ -77,13 +80,16 @@ def load_csv_robust(file_path):
         (';', 'cp1252'),         # Windows encoding con punto e virgola
         ('\t', 'utf-8'),         # Tab-separated UTF-8
         ('\t', 'latin-1'),       # Tab-separated latin-1
+        ('\t', 'utf-16'),        # Tab-separated UTF-16
         ('|', 'utf-8'),          # Pipe-separated UTF-8
         ('|', 'latin-1'),        # Pipe-separated latin-1
+        ('|', 'utf-16'),         # Pipe-separated UTF-16
     ]
     
     best_df = None
     best_score = -1
     best_combination = None
+    best_info = None
     errors = []
     
     def score_dataframe(df):
@@ -91,6 +97,7 @@ def load_csv_robust(file_path):
         num_cols = len(df.columns)
         non_empty_rows = len(df.dropna(how='all'))
         col_names = df.columns.tolist()
+        
         # Penalize if all columns are unnamed or empty
         num_unnamed = sum(
             (
@@ -99,19 +106,30 @@ def load_csv_robust(file_path):
             )
             for col in col_names
         )
+        
+        # Penalize BOM and control characters in column names
+        bom_penalty = 0
+        for col in col_names:
+            if isinstance(col, str):
+                # Check for BOM characters (UTF-16 BOM: \ufeff, \ufffe, or other control chars)
+                if any(ord(c) < 32 or ord(c) in [0xfeff, 0xfffe, 0xfffd] for c in col):
+                    bom_penalty += 10
+        
         unique_names = len(set(col_names))
         # Penalize if all column names are the same
         col_name_quality = (unique_names / num_cols) if num_cols > 0 else 0
         # Penalize if most columns are unnamed
         unnamed_penalty = num_unnamed / num_cols if num_cols > 0 else 1
+        
         # Data consistency: fraction of rows with at least half non-null columns
         if num_cols > 0 and len(df) > 0:
             sufficient_data_rows = (df.notnull().sum(axis=1) >= (num_cols // 2)).sum()
             data_consistency = sufficient_data_rows / len(df)
         else:
             data_consistency = 0
-        # Final score: weighted sum
-        score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10 + data_consistency * 10 - unnamed_penalty * 5
+        
+        # Final score: weighted sum with BOM penalty
+        score = num_cols * 0.5 + non_empty_rows * 0.2 + col_name_quality * 10 + data_consistency * 10 - unnamed_penalty * 5 - bom_penalty
         return score, num_cols, non_empty_rows
     
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
@@ -131,6 +149,7 @@ def load_csv_robust(file_path):
             if score > best_score:
                 best_df = df
                 best_score = score
+                best_info = {'separator': sep, 'encoding': encoding}
                 best_combination = (sep, encoding)
         except Exception as e:
             errors.append(f"{sep}|{encoding}: {str(e)}")
@@ -148,7 +167,7 @@ def load_csv_robust(file_path):
                          f"Probabile file non valido o corrotto.")
             logging.error(error_msg)
             raise CSVLoadError(error_msg)
-        return best_df
+        return best_df, best_info
     else:
         error_msg = "Impossibile caricare il CSV con nessuna combinazione. Errori: " + "; ".join(errors)
         logging.error(error_msg)
@@ -163,10 +182,17 @@ def convert_file(file_path, db_type, schema, table, database=None):
         chunking = ext == '.csv' and file_size_mb > 10
         if ext == '.csv':
             if not chunking:
-                df = load_csv_robust(file_path)
+                df, csv_info = load_csv_robust(file_path)
             else:
                 # Determina separatore/codifica migliore usando load_csv_robust (primo chunk)
-                combinations = [(',', 'utf-8'), (';', 'utf-8'), (',', 'latin-1'), (';', 'latin-1'), (',', 'cp1252'), (';', 'cp1252'), ('\t', 'utf-8'), ('\t', 'latin-1'), ('|', 'utf-8'), ('|', 'latin-1')]
+                combinations = [
+                    (',', 'utf-8'), (';', 'utf-8'), ('\t', 'utf-8'), ('|', 'utf-8'),
+                    (',', 'latin-1'), (';', 'latin-1'), ('\t', 'latin-1'), ('|', 'latin-1'),
+                    (',', 'cp1252'), (';', 'cp1252'),
+                    (',', 'utf-16'), (';', 'utf-16'), ('\t', 'utf-16'), ('|', 'utf-16'),
+                    (',', 'utf-16-le'), (';', 'utf-16-le'), ('\t', 'utf-16-le'), ('|', 'utf-16-le'),
+                    (',', 'utf-16-be'), (';', 'utf-16-be'), ('\t', 'utf-16-be'), ('|', 'utf-16-be')
+                ]
                 best_sep, best_enc = None, None
                 best_score = -1
                 for sep, encoding in combinations:
