@@ -12,7 +12,7 @@ import pandas as pd
 import logging
 from unittest.mock import patch, MagicMock
 import sys
-import pytest
+# import pytest  # Optional for now
 
 # Importa le funzioni da testare
 from excel_to_sql_converter import (
@@ -48,7 +48,7 @@ class TestCSVLoading(unittest.TestCase):
         csv_content = "nome,età,città\nMario,30,Roma\nLucia,25,Milano"
         filepath = self.create_test_csv(csv_content)
         
-        df = load_csv_robust(filepath)
+        df, info = load_csv_robust(filepath)
         
         self.assertEqual(len(df), 2)
         self.assertEqual(list(df.columns), ['nome', 'età', 'città'])
@@ -59,7 +59,7 @@ class TestCSVLoading(unittest.TestCase):
         csv_content = "nome;età;città\nMario;30;Roma\nLucia;25;Milano"
         filepath = self.create_test_csv(csv_content)
         
-        df = load_csv_robust(filepath)
+        df, info = load_csv_robust(filepath)
         
         self.assertEqual(len(df), 2)
         self.assertEqual(list(df.columns), ['nome', 'età', 'città'])
@@ -67,10 +67,10 @@ class TestCSVLoading(unittest.TestCase):
     
     def test_load_csv_semicolon_latin1(self):
         """Test caricamento CSV con encoding latin-1"""
-        csv_content = "nome;età;città\nMàrio;30;Ròma\nLùcia;25;Milàno"
-        filepath = self.create_test_csv(csv_content, encoding="latin-1")
+        csv_content = "nome;età;città\nMàrio;30;Roma\nLucia;25;Milano"
+        filepath = self.create_test_csv(csv_content, encoding='latin-1')
         
-        df = load_csv_robust(filepath)
+        df, info = load_csv_robust(filepath)
         
         self.assertEqual(len(df), 2)
         self.assertEqual(df.iloc[0]['nome'], 'Màrio')
@@ -80,7 +80,7 @@ class TestCSVLoading(unittest.TestCase):
         csv_content = "nome\tetà\tcittà\nMario\t30\tRoma\nLucia\t25\tMilano"
         filepath = self.create_test_csv(csv_content)
         
-        df = load_csv_robust(filepath)
+        df, info = load_csv_robust(filepath)
         
         self.assertEqual(len(df), 2)
         self.assertEqual(list(df.columns), ['nome', 'età', 'città'])
@@ -90,7 +90,7 @@ class TestCSVLoading(unittest.TestCase):
         csv_content = "nome|età|città\nMario|30|Roma\nLucia|25|Milano"
         filepath = self.create_test_csv(csv_content)
         
-        df = load_csv_robust(filepath)
+        df, info = load_csv_robust(filepath)
         
         self.assertEqual(len(df), 2)
         self.assertEqual(list(df.columns), ['nome', 'età', 'città'])
@@ -117,7 +117,7 @@ class TestCSVLoading(unittest.TestCase):
         csv_content = "col1,col2;col3\nval1,val2;val3\nval4,val5;val6"
         filepath = self.create_test_csv(csv_content)
         
-        df = load_csv_robust(filepath)
+        df, info = load_csv_robust(filepath)
         
         # Dovrebbe scegliere il separatore che dà più colonne (punto e virgola = 2 colonne)
         self.assertEqual(len(df.columns), 2)
@@ -363,7 +363,7 @@ def create_large_csv(path, rows=500000, cols=10):
         for r in range(rows):
             writer.writerow([f'data_{r}_{c}' for c in range(cols)])
 
-@pytest.mark.slow
+# @pytest.mark.slow  # Optional for now
 def test_convert_large_csv(tmp_path):
     csv_path = tmp_path / 'large.csv'
     create_large_csv(str(csv_path), rows=500000, cols=10)
@@ -377,6 +377,71 @@ def test_convert_large_csv(tmp_path):
     assert os.path.getsize(out_sql) > 0
     # Cleanup
     os.remove(out_sql)
+
+
+def test_utf16_bom_handling():
+    """Test proper handling of UTF-16 BOM files like SQL Server exports."""
+    test_csv_path = 'test_utf16_bom.csv'
+    test_content = "CODICE;DESCRIZIONE;PREZZO\nG001;Prodotto Test;25.50\nG002;Articolo UTF-16;12.75"
+    
+    try:
+        # Create UTF-16 file with BOM (like SQL Server export)
+        with open(test_csv_path, 'w', encoding='utf-16') as f:
+            f.write(test_content)
+        
+        # Verify BOM is present
+        with open(test_csv_path, 'rb') as f:
+            first_bytes = f.read(2)
+            assert first_bytes == b'\xff\xfe', f"Expected UTF-16 BOM, got {first_bytes}"
+        
+        # Test that load_csv_robust handles it correctly
+        df, info = load_csv_robust(test_csv_path)
+        
+        # Verify encoding detection
+        assert info['encoding'] == 'utf-16'
+        assert info['separator'] == ';'
+        
+        # Verify columns are clean (no BOM characters)
+        expected_columns = ['CODICE', 'DESCRIZIONE', 'PREZZO']
+        assert list(df.columns) == expected_columns
+        
+        # Verify no control characters in column names
+        for col in df.columns:
+            assert isinstance(col, str)
+            # Check for BOM or control characters
+            control_chars = [c for c in col if ord(c) < 32 or ord(c) in [0xfeff, 0xfffe, 0xfffd]]
+            assert not control_chars, f"Column '{col}' contains control characters: {control_chars}"
+        
+        # Verify data integrity
+        assert len(df) == 2
+        assert df.iloc[0]['CODICE'] == 'G001'
+        assert df.iloc[0]['DESCRIZIONE'] == 'Prodotto Test'
+        assert df.iloc[1]['PREZZO'] == '12.75'
+        
+        # Test full conversion
+        result = convert_file(test_csv_path, 'postgres', 'public', 'test_utf16')
+        assert 'OK' in result
+        
+        # Verify generated SQL is clean
+        sql_path = test_csv_path.replace('.csv', '.sql')
+        assert os.path.exists(sql_path)
+        
+        with open(sql_path, 'r', encoding='utf-8') as f:
+            sql_content = f.read()
+        
+        # Check that column names in SQL don't have BOM artifacts
+        assert '"CODICE"' in sql_content
+        assert '"DESCRIZIONE"' in sql_content  
+        assert '"PREZZO"' in sql_content
+        assert 'ÿþ' not in sql_content  # Common BOM artifact
+        assert 'Unnamed' not in sql_content  # Should not have unnamed columns
+        
+        # Clean up
+        os.remove(sql_path)
+        
+    finally:
+        if os.path.exists(test_csv_path):
+            os.remove(test_csv_path)
 
 
 if __name__ == '__main__':
