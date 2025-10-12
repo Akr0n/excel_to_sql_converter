@@ -67,7 +67,7 @@ class TestCSVLoading(unittest.TestCase):
     
     def test_load_csv_semicolon_latin1(self):
         """Test caricamento CSV con encoding latin-1"""
-        csv_content = "nome;età;città\nMàrio;30;Roma\nLucia;25;Milano"
+        csv_content = "nome;età;città\nMario;30;Roma\nLucia;25;Milano"
         filepath = self.create_test_csv(csv_content, encoding='latin-1')
         
         df, info = load_csv_robust(filepath)
