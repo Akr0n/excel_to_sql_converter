@@ -1,0 +1,100 @@
+name: CI - Python with SonarCloud Analysis
+
+on:
+  push:
+    branches: [ develop ]
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+  pull-requests: write
+  security-events: write
+
+jobs:
+  sonarcloud:
+    name: Build, Test & SonarCloud Analysis
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      checks: write
+      pull-requests: write
+      security-events: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install -r requirements-dev.txt || true
+          pip install pytest pytest-cov
+          pip install pylint
+          pip install sonarcloud
+      - name: Run tests with coverage
+        run: |
+          python -m pytest test_excel_to_sql_converter.py -v --cov=excel_to_sql_converter --cov-report=xml --cov-report=html
+      - name: Run pylint
+        run: |
+          pylint excel_to_sql_converter.py --output-format=parseable > pylint-report.txt
+      - name: SonarCloud Scan
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          sonar-scanner \
+            -Dsonar.projectKey=botlogics_excel_to_sql_converter \
+            -Dsonar.organization=botlogics \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.python.coverage.reportPaths=coverage.xml \
+            -Dsonar.sources=.
+      - name: Upload coverage & pylint reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            coverage.xml
+            htmlcov/
+            pylint-report.txt
+
+  build-linux:
+    name: Build & Test (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt || true
+          pip install -r requirements-dev.txt || true
+          pip install pytest pytest-cov
+      - name: Run tests with coverage
+        run: |
+          python -m pytest test_excel_to_sql_converter.py -v --cov=excel_to_sql_converter --cov-report=xml --cov-report=html
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports-linux
+          path: |
+            coverage.xml
+            htmlcov/
