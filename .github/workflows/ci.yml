@@ -2,7 +2,12 @@ name: CI - Python with SonarCloud Analysis
 
 on:
   push:
-    branches: [ develop ]
+    branches:
+      - develop
+    paths:
+      - '*.py'
+    paths-ignore:
+      - '*.md'
 
 permissions:
   contents: read

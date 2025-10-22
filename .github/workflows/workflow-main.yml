@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '*.py'
+    paths-ignore:
+      - '*.md'
 
 permissions:
   contents: write
