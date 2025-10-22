@@ -1,8 +1,8 @@
-<p align="center">
-  <img src="images/logo.png" alt="Excel to SQL Converter" width="120" />
-</p>
-
 # Excel to SQL Converter
+
+[![coverage](coverage.svg)](htmlcov/index.html)
+
+![Excel to SQL Converter](images/logo.png)
 
 ---
 
@@ -23,6 +23,8 @@ L’obiettivo del progetto è offrire uno strumento semplice, leggero e facilmen
 
 ## Come iniziare
 
+Di seguito i passaggi per utilizzare l'applicazione.
+
 1. Scarica l'ultima versione dalla sezione Releases di GitHub.
 
 2. Esegui il file .exe, Windows ti mostrerà un avviso di sicurezza, ignoralo tranquillamente.
@@ -34,6 +36,7 @@ L’obiettivo del progetto è offrire uno strumento semplice, leggero e facilmen
 5. Seleziona "Converti" e attendi la fine del processo. Il tempo d'attesa varia a seconda della grandezza del file.
 
 6. Il file .sql verrà salvato, insieme al log di esecuzione, nella stessa cartella del file originale.
+
 ---
 
 ## Testing e Sviluppo
@@ -42,21 +45,39 @@ Il progetto include una suite completa di test automatici per garantire qualità
 
 ### Esecuzione Test
 
-**Opzione 1: Script automatico**
+#### Opzione 1: Script automatico
+
 ```bash
 ./run_tests.bat
 ```
 
-**Opzione 2: Comando manuale**
+#### Opzione 2: Comando manuale
+
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest test_excel_to_sql_converter.py -v
 ```
 
-**Opzione 3: Con coverage report**
+#### Opzione 3: Con coverage report
+
 ```bash
 python -m pytest test_excel_to_sql_converter.py -v --cov=excel_to_sql_converter --cov-report=html
 ```
+
+#### Opzione 4: Coverage locale (senza workflow)
+
+Per generare report di coverage completi in locale (XML, HTML e badge SVG):
+
+```bash
+pip install -r requirements-dev.txt
+python tools/generate_coverage.py
+```
+
+Output generati:
+
+- HTML: `htmlcov/index.html`
+- XML: `coverage.xml`
+- Badge: `coverage.svg` (facoltativo, puoi aggiungerlo al README con `![coverage](coverage.svg)`).
 
 ### Test Inclusi
 

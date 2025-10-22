@@ -1,4 +1,4 @@
-name: CI - Python with SonarCloud Analysis
+name: CI - Python Tests
 
 on:
   push:
@@ -15,8 +15,8 @@ permissions:
   security-events: write
 
 jobs:
-  sonarcloud:
-    name: Build, Test & SonarCloud Analysis
+  tests:
+    name: Build & Test
     runs-on: windows-latest
     permissions:
       contents: read
@@ -48,39 +48,16 @@ jobs:
           pip install pylint
       - name: Run tests with coverage
         run: |
-          python -m pytest test_excel_to_sql_converter.py -v --cov=excel_to_sql_converter --cov-report=xml --cov-report=html
+          python -m pytest test_excel_to_sql_converter.py -v
       - name: Run pylint
         run: |
           pylint excel_to_sql_converter.py --output-format=parseable > pylint-report.txt || true
-      - name: Ensure SonarCloud main branch is 'develop'
-        shell: pwsh
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          # Try to set/rename the main branch to 'develop' (safe to run multiple times)
-          $headers = @{ Authorization = "Bearer $env:SONAR_TOKEN" }
-          $uri = "https://sonarcloud.io/api/project_branches/rename?project=analyze_excel_to_sql_converter&name=develop"
-          try {
-            $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -ErrorAction Stop
-            Write-Host "Main branch set to 'develop' on SonarCloud"
-          } catch {
-            Write-Host "Main branch may already be set or project not yet initialized; continuing"
-          }
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.branch.name=develop
+      # SonarCloud analysis removed per project decision
       - name: Upload coverage & pylint reports
         uses: actions/upload-artifact@v4
         with:
           name: reports
           path: |
-            coverage.xml
-            htmlcov/
             pylint-report.txt
 
   build-linux:
@@ -101,13 +78,12 @@ jobs:
           pip install -r requirements.txt || true
           pip install -r requirements-dev.txt || true
           pip install pytest pytest-cov
-      - name: Run tests with coverage
+      - name: Run tests
         run: |
-          python -m pytest test_excel_to_sql_converter.py -v --cov=excel_to_sql_converter --cov-report=xml --cov-report=html
+          python -m pytest test_excel_to_sql_converter.py -v
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-reports-linux
+          name: test-reports-linux
           path: |
-            coverage.xml
-            htmlcov/
+            .
