@@ -12,7 +12,6 @@ import pandas as pd
 import logging
 from unittest.mock import patch, MagicMock
 import sys
-# import pytest  # Optional for now
 
 # Importa le funzioni da testare
 from excel_to_sql_converter import (

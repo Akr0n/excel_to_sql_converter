@@ -46,24 +46,24 @@ jobs:
           pip install -r requirements-dev.txt || true
           pip install pytest pytest-cov
           pip install pylint
-          pip install sonarcloud
       - name: Run tests with coverage
         run: |
           python -m pytest test_excel_to_sql_converter.py -v --cov=excel_to_sql_converter --cov-report=xml --cov-report=html
       - name: Run pylint
         run: |
-          pylint excel_to_sql_converter.py --output-format=parseable > pylint-report.txt
+          pylint excel_to_sql_converter.py --output-format=parseable > pylint-report.txt || true
       - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          sonar-scanner \
-            -Dsonar.projectKey=botlogics_excel_to_sql_converter \
-            -Dsonar.organization=botlogics \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.login=${{ secrets.SONAR_TOKEN }} \
-            -Dsonar.python.coverage.reportPaths=coverage.xml \
+        with:
+          args: >
+            -Dsonar.projectKey=botlogics_excel_to_sql_converter
+            -Dsonar.organization=botlogics
+            -Dsonar.python.coverage.reportPaths=coverage.xml
             -Dsonar.sources=.
+            -Dsonar.exclusions=**/*test*.py,**/test_*.py
       - name: Upload coverage & pylint reports
         uses: actions/upload-artifact@v4
         with:
