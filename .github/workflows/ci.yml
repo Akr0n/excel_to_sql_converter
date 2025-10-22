@@ -52,6 +52,20 @@ jobs:
       - name: Run pylint
         run: |
           pylint excel_to_sql_converter.py --output-format=parseable > pylint-report.txt || true
+      - name: Ensure SonarCloud main branch is 'develop'
+        shell: pwsh
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          # Try to set/rename the main branch to 'develop' (safe to run multiple times)
+          $headers = @{ Authorization = "Bearer $env:SONAR_TOKEN" }
+          $uri = "https://sonarcloud.io/api/project_branches/rename?project=analyze_excel_to_sql_converter&name=develop"
+          try {
+            $response = Invoke-RestMethod -Method Post -Uri $uri -Headers $headers -ErrorAction Stop
+            Write-Host "Main branch set to 'develop' on SonarCloud"
+          } catch {
+            Write-Host "Main branch may already be set or project not yet initialized; continuing"
+          }
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
