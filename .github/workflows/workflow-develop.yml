@@ -5,9 +5,7 @@ on:
     branches:
       - develop
     paths:
-      - '*.py'
-    paths-ignore:
-      - '*.md'
+      - '**/*.py'
 
 permissions:
   contents: write
