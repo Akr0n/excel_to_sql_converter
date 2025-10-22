@@ -7,7 +7,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 
 #versione corrente
-APP_VERSION = "1.0.47"
+APP_VERSION = "1.0.48"
 
 # Costanti UI
 DEFAULT_FONT_FAMILY = "Segoe UI"

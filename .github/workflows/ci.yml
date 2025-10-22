@@ -57,6 +57,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.branch.name=develop
       - name: Upload coverage & pylint reports
         uses: actions/upload-artifact@v4
         with:
