@@ -1,0 +1,251 @@
+name: Advanced Monthly Artifact Cleanup
+on:
+  schedule:
+    # Ogni 1 del mese alle 03:00 AM
+    - cron: '0 3 1 * *'
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: 'Età massima in giorni per gli artifacts'
+        required: false
+        default: '30'
+        type: string
+      delete_prereleases:
+        description: 'Elimina anche le pre-release'
+        required: false
+        default: 'true'
+        type: boolean
+
+jobs:
+  cleanup-artifacts-and-prereleases:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    
+    permissions:
+      actions: write
+      contents: write  # Necessario per eliminare release e tag
+    
+    steps:
+      - name: Setup GitHub CLI
+        run: |
+          gh --version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Get repository info
+        id: repo-info
+        run: |
+          echo "owner=${{ github.repository_owner }}" >> $env:GITHUB_OUTPUT
+          echo "repo=${{ github.event.repository.name }}" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+      
+      # ========================================
+      # PARTE 1: CLEANUP ARTIFACTS
+      # ========================================
+      - name: Cleanup old artifacts
+        run: |
+          $ErrorActionPreference = "Continue"
+          
+          $REPO = "${{ steps.repo-info.outputs.owner }}/${{ steps.repo-info.outputs.repo }}"
+          $MAX_AGE_DAYS = [int]"${{ github.event.inputs.max_age_days || '30' }}"
+          
+          Write-Host "🧹 === PULIZIA ARTIFACTS ===" -ForegroundColor Green
+          Write-Host "📂 Repository: $REPO" -ForegroundColor Cyan
+          Write-Host "📅 Eliminando artifacts più vecchi di $MAX_AGE_DAYS giorni" -ForegroundColor Yellow
+          
+          # Calcola data limite
+          $CutoffDate = (Get-Date).AddDays(-$MAX_AGE_DAYS).ToString("yyyy-MM-ddTHH:mm:ssZ")
+          Write-Host "📅 Data limite: $CutoffDate" -ForegroundColor Cyan
+          
+          $DeletedCount = 0
+          $TotalSize = 0
+          
+          try {
+              # Ottieni artifacts
+              Write-Host "🔍 Ottenendo lista artifacts..." -ForegroundColor Blue
+              $artifactsJson = gh api repos/$REPO/actions/artifacts --paginate
+              $artifacts = $artifactsJson | ConvertFrom-Json
+              
+              if ($artifacts.total_count -eq 0) {
+                  Write-Host "✅ Nessun artifact presente" -ForegroundColor Green
+              } else {
+                  Write-Host "📦 Totale artifacts: $($artifacts.total_count)" -ForegroundColor White
+                  
+                  # Filtra artifacts vecchi
+                  $artifactsToDelete = $artifacts.artifacts | Where-Object { $_.created_at -lt $CutoffDate }
+                  
+                  Write-Host "🗑️  Artifacts da eliminare: $($artifactsToDelete.Count)" -ForegroundColor Red
+                  
+                  foreach ($artifact in $artifactsToDelete) {
+                      $age = [math]::Round(((Get-Date) - [DateTime]::Parse($artifact.created_at)).TotalDays, 1)
+                      Write-Host "🗑️  Eliminando: $($artifact.name) (Età: $age giorni)" -ForegroundColor Yellow
+                      
+                      try {
+                          gh api repos/$REPO/actions/artifacts/$($artifact.id) -X DELETE
+                          Write-Host "✅ Eliminato: $($artifact.name)" -ForegroundColor Green
+                          $DeletedCount++
+                          $TotalSize += $artifact.size_in_bytes
+                      } catch {
+                          Write-Host "❌ Errore eliminando: $($artifact.name)" -ForegroundColor Red
+                      }
+                      Start-Sleep -Seconds 1
+                  }
+              }
+          } catch {
+              Write-Host "❌ Errore nel recupero artifacts: $($_.Exception.Message)" -ForegroundColor Red
+          }
+          
+          # Salva statistiche per il riepilogo
+          echo "ARTIFACTS_DELETED=$DeletedCount" >> $env:GITHUB_ENV
+          echo "ARTIFACTS_SIZE_FREED=$TotalSize" >> $env:GITHUB_ENV
+          
+          Write-Host "📊 Artifacts eliminati: $DeletedCount" -ForegroundColor Magenta
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      # ========================================
+      # PARTE 2: CLEANUP PRE-RELEASES ONLY
+      # ========================================
+      - name: Cleanup pre-releases only
+        if: ${{ github.event.inputs.delete_prereleases == 'true' || github.event.inputs.delete_prereleases == '' }}
+        run: |
+          $ErrorActionPreference = "Continue"
+          
+          $REPO = "${{ steps.repo-info.outputs.owner }}/${{ steps.repo-info.outputs.repo }}"
+          
+          Write-Host ""
+          Write-Host "🔶 === PULIZIA PRE-RELEASES ===" -ForegroundColor DarkYellow
+          Write-Host "📂 Repository: $REPO" -ForegroundColor Cyan
+          Write-Host "⚠️  ATTENZIONE: Eliminazione SOLO pre-releases (prerelease: true)" -ForegroundColor Red
+          
+          $PrereleasesDeleted = 0
+          
+          try {
+              # Ottieni tutte le release
+              Write-Host "🔍 Ottenendo lista release..." -ForegroundColor Blue
+              $releasesJson = gh api repos/$REPO/releases --paginate
+              $releases = $releasesJson | ConvertFrom-Json
+              
+              # Conta release per tipo
+              $totalReleases = $releases.Count
+              $preReleases = $releases | Where-Object { $_.prerelease -eq $true }
+              $normalReleases = $releases | Where-Object { $_.prerelease -eq $false }
+              
+              Write-Host "📊 Totale release: $totalReleases" -ForegroundColor White
+              Write-Host "📊 Pre-releases: $($preReleases.Count)" -ForegroundColor Yellow
+              Write-Host "📊 Release normali: $($normalReleases.Count)" -ForegroundColor Green
+              Write-Host ""
+              
+              if ($preReleases.Count -eq 0) {
+                  Write-Host "✅ Nessuna pre-release da eliminare" -ForegroundColor Green
+              } else {
+                  Write-Host "🔶 Pre-releases da eliminare:" -ForegroundColor DarkYellow
+                  foreach ($preRelease in $preReleases) {
+                      Write-Host "  • $($preRelease.name) (Tag: $($preRelease.tag_name), ID: $($preRelease.id))" -ForegroundColor Gray
+                  }
+                  Write-Host ""
+                  
+                  # Elimina SOLO le pre-releases
+                  foreach ($preRelease in $preReleases) {
+                      Write-Host "🔶 Eliminando PRE-RELEASE: $($preRelease.name) (Tag: $($preRelease.tag_name))" -ForegroundColor Yellow
+                      
+                      try {
+                          # Elimina la pre-release
+                          gh api repos/$REPO/releases/$($preRelease.id) -X DELETE
+                          Write-Host "✅ Pre-release eliminata: $($preRelease.name)" -ForegroundColor Green
+                          $PrereleasesDeleted++
+                          
+                          # Prova a eliminare anche il tag associato
+                          Start-Sleep -Seconds 2
+                          try {
+                              gh api repos/$REPO/git/refs/tags/$($preRelease.tag_name) -X DELETE
+                              Write-Host "✅ Tag eliminato: $($preRelease.tag_name)" -ForegroundColor Green
+                          } catch {
+                              Write-Host "⚠️  Avviso: Tag $($preRelease.tag_name) non eliminato" -ForegroundColor Yellow
+                          }
+                      } catch {
+                          Write-Host "❌ Errore eliminando pre-release: $($preRelease.name)" -ForegroundColor Red
+                      }
+                      Start-Sleep -Seconds 2
+                  }
+              }
+          } catch {
+              Write-Host "❌ Errore nel recupero release: $($_.Exception.Message)" -ForegroundColor Red
+          }
+          
+          # Salva statistiche per il riepilogo
+          echo "PRERELEASES_DELETED=$PrereleasesDeleted" >> $env:GITHUB_ENV
+          
+          Write-Host "📊 Pre-releases eliminate: $PrereleasesDeleted" -ForegroundColor Magenta
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      # ========================================
+      # VERIFICA FINALE E RIEPILOGO
+      # ========================================
+      - name: Final verification and summary
+        run: |
+          Write-Host ""
+          Write-Host "==========================================" -ForegroundColor Magenta
+          Write-Host "🏁 RIEPILOGO OPERAZIONE COMPLETATA" -ForegroundColor Magenta
+          Write-Host "==========================================" -ForegroundColor Magenta
+          Write-Host "📂 Repository: ${{ steps.repo-info.outputs.owner }}/${{ steps.repo-info.outputs.repo }}" -ForegroundColor Cyan
+          Write-Host "📅 Data/Ora: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss UTC')" -ForegroundColor Gray
+          Write-Host ""
+          Write-Host "📊 RISULTATI:" -ForegroundColor White
+          
+          $artifactsDeleted = $env:ARTIFACTS_DELETED
+          $artifactsSize = [long]$env:ARTIFACTS_SIZE_FREED
+          $prereleasesDeleted = $env:PRERELEASES_DELETED
+          
+          Write-Host "🗃️  Artifacts eliminati: $artifactsDeleted" -ForegroundColor Green
+          
+          # Converti dimensione artifacts
+          if ($artifactsSize -gt 1GB) {
+              $sizeDisplay = "{0:N2} GB" -f ($artifactsSize / 1GB)
+          } elseif ($artifactsSize -gt 1MB) {
+              $sizeDisplay = "{0:N2} MB" -f ($artifactsSize / 1MB)
+          } elseif ($artifactsSize -gt 1KB) {
+              $sizeDisplay = "{0:N2} KB" -f ($artifactsSize / 1KB)
+          } else {
+              $sizeDisplay = "$artifactsSize bytes"
+          }
+          
+          Write-Host "💾 Spazio artifacts liberato: $sizeDisplay" -ForegroundColor Green
+          Write-Host "🔶 Pre-releases eliminate: $prereleasesDeleted" -ForegroundColor Yellow
+          Write-Host ""
+          
+          # Verifica post-cleanup
+          Write-Host "🔍 Verifica post-cleanup:" -ForegroundColor Blue
+          
+          try {
+              # Conta release rimanenti
+              $remainingReleasesJson = gh api repos/${{ steps.repo-info.outputs.owner }}/${{ steps.repo-info.outputs.repo }}/releases --paginate
+              $remainingReleases = $remainingReleasesJson | ConvertFrom-Json
+              
+              $remainingTotal = $remainingReleases.Count
+              $remainingPreReleases = ($remainingReleases | Where-Object { $_.prerelease -eq $true }).Count
+              $remainingNormalReleases = ($remainingReleases | Where-Object { $_.prerelease -eq $false }).Count
+              
+              Write-Host "📊 Release rimanenti totali: $remainingTotal" -ForegroundColor White
+              Write-Host "🔶 Pre-releases rimanenti: $remainingPreReleases" -ForegroundColor Yellow
+              Write-Host "✅ Release normali rimanenti: $remainingNormalReleases" -ForegroundColor Green
+              Write-Host ""
+              
+              # Controlla che non abbiamo eliminato release normali per errore
+              if ([int]$prereleasesDeleted -gt 0 -and $remainingNormalReleases -gt 0) {
+                  Write-Host "✅ VERIFICA PASSATA: Release normali preservate correttamente" -ForegroundColor Green
+              } elseif ([int]$prereleasesDeleted -gt 0 -and $remainingNormalReleases -eq 0) {
+                  Write-Host "⚠️  ATTENZIONE: Nessuna release normale rimanente (verifica se è corretto)" -ForegroundColor Yellow
+              }
+              
+              Write-Host "✨ Operazione completata con successo!" -ForegroundColor Green
+              
+          } catch {
+              Write-Host "⚠️  Impossibile verificare le release rimanenti" -ForegroundColor Yellow
+          }
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
