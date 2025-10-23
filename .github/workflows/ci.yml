@@ -52,7 +52,6 @@ jobs:
       - name: Run pylint
         run: |
           pylint excel_to_sql_converter.py --output-format=parseable > pylint-report.txt || true
-      # SonarCloud analysis removed per project decision
       - name: Upload coverage & pylint reports
         uses: actions/upload-artifact@v4
         with:
