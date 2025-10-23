@@ -65,7 +65,6 @@ def setup_logging(file_path):
 
 def format_insert(db_type, schema, table, df):
     # Helpers: validate and quote SQL identifiers (schema, table, columns)
-    import re
 
     def safe_identifier(name):
         """Return a sanitized identifier string or raise ValueError if invalid.
