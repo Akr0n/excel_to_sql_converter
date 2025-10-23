@@ -56,13 +56,9 @@ def setup_logging(file_path):
     handler.setLevel(logging.INFO)
     logger.setLevel(logging.INFO)
     logger.addHandler(handler)
-    try:
-        import weakref
-        # Ensure handler will close if it is removed without explicit close() (tests may clear handlers)
-        weakref.finalize(handler, handler.close)
-    except Exception:
-        # If weakref not available for some reason, fall back to normal behavior
-        pass
+    import weakref
+    # Ensure handler will close if it is removed without explicit close() (tests may clear handlers)
+    weakref.finalize(handler, handler.close)
 
     logger.info(f"File di log creato: {log_file}")
     return log_file
