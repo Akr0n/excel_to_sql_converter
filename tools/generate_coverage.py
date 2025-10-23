@@ -14,8 +14,9 @@ def main() -> int:
     os.chdir(repo_root)
 
     # Install dev deps if missing (best-effort, optional)
-    run([sys.executable, "-m", "pip", "install", "-r", "requirements-dev.txt"])  # noqa: E999
-
+    dev_deps_code = run([sys.executable, "-m", "pip", "install", "-r", "requirements-dev.txt"])  # noqa: E999
+    if dev_deps_code != 0:
+        print("Warning: Failed to install development dependencies (requirements-dev.txt). Subsequent steps may fail.")
     # Run tests with coverage (XML + HTML)
     code = run([
         sys.executable, "-m", "pytest", "test_excel_to_sql_converter.py", "-v",
