@@ -249,7 +249,14 @@ def convert_file(file_path, db_type, schema, table, database=None):
                 df, csv_info = load_csv_robust(file_path)
             else:
                 # Determina separatore/codifica migliore usando load_csv_robust (primo chunk)
-                combinations = [(',', 'utf-8'), (';', 'utf-8'), (',', 'latin-1'), (';', 'latin-1'), (',', 'cp1252'), (';', 'cp1252'), ('\t', 'utf-8'), ('\t', 'latin-1'), ('|', 'utf-8'), ('|', 'latin-1')]
+                combinations = [
+                    (',', 'utf-8'), (';', 'utf-8'), ('\t', 'utf-8'), ('|', 'utf-8'),
+                    (',', 'latin-1'), (';', 'latin-1'), ('\t', 'latin-1'), ('|', 'latin-1'),
+                    (',', 'cp1252'), (';', 'cp1252'),
+                    (',', 'utf-16'), (';', 'utf-16'), ('\t', 'utf-16'), ('|', 'utf-16'),
+                    (',', 'utf-16-le'), (';', 'utf-16-le'), ('\t', 'utf-16-le'), ('|', 'utf-16-le'),
+                    (',', 'utf-16-be'), (';', 'utf-16-be'), ('\t', 'utf-16-be'), ('|', 'utf-16-be')
+                ]
                 best_sep, best_enc = None, None
                 best_score = -1
                 for sep, encoding in combinations:

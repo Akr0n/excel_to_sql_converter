@@ -1,12 +1,12 @@
 name: CI - Python Tests
 
 on:
-    pull_request:
-        branches:
-        - main
-        paths:
-        - '**/*.py'
-        - '.github/workflows/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**/*.py'
+      - '.github/workflows/**'
 
 permissions:
   contents: read
