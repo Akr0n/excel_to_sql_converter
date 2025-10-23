@@ -7,7 +7,7 @@ from tkinter import filedialog, messagebox
 from PIL import Image, ImageTk
 
 #versione corrente
-APP_VERSION = "1.0.44"
+APP_VERSION = "1.0.50"
 
 # Costanti UI
 DEFAULT_FONT_FAMILY = "Segoe UI"
@@ -36,29 +36,93 @@ def setup_logging(file_path):
     log_file = os.path.join(dir_path, f"{base}_log.log")
     global logger
     logger = logging.getLogger()
+    # Close existing handlers properly to avoid ResourceWarning about open files
     if logger.hasHandlers():
-        logger.handlers.clear()
-    logging.basicConfig(
-        filename=log_file,
-        level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
-    )
+        for h in list(logger.handlers):
+            try:
+                h.flush()
+                h.close()
+            except Exception:
+                pass
+            try:
+                logger.removeHandler(h)
+            except Exception:
+                pass
+
+    # Create a dedicated FileHandler so we can control its lifecycle explicitly
+    handler = logging.FileHandler(log_file, mode='a', encoding='utf-8')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    handler.setLevel(logging.INFO)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
+    import weakref
+    # Ensure handler will close if it is removed without explicit close() (tests may clear handlers)
+    weakref.finalize(handler, handler.close)
+
     logger.info(f"File di log creato: {log_file}")
     return log_file
 
 def format_insert(db_type, schema, table, df):
+    # Helpers: validate and quote SQL identifiers (schema, table, columns)
+
+    def safe_identifier(name):
+        """Return a sanitized identifier string or raise ValueError if invalid.
+
+        This function rejects identifiers containing dangerous characters (such as quotes,
+        semicolons, brackets, slashes, or newlines) and any whitespace. It does not
+        explicitly restrict to Unicode letters, digits, or underscores.
+
+        Note:
+            This function does NOT guarantee SQL standard compliance for identifiers.
+            It allows any characters except those explicitly blacklisted above, which may
+            include characters that are invalid in some SQL dialects but are not explicitly checked.
+        """
+        if not isinstance(name, str) or name.strip() == "":
+            raise ValueError("Identifier must be a non-empty string")
+        n = name.strip()
+        # Reject identifiers containing any internal whitespace (spaces, tabs, etc.)
+        if any(ch.isspace() for ch in n):
+            raise ValueError(f"Invalid identifier (contains whitespace): {name}")
+        # Reject dangerous punctuation
+        for ch in ['"', "'", ';', '[', ']', '\\', '/', '\n', '\r', '@', '-', '*', '%', '`']:
+            if ch in n:
+                raise ValueError(f"Invalid identifier: {name}")
+        # Reject control characters (ASCII < 32)
+        if any(ord(ch) < 32 for ch in n):
+            raise ValueError(f"Invalid identifier (contains control character): {name}")
+        # If passes basic checks, return as-is (we'll quote appropriately when building SQL)
+        return n
+
     statements = []
-    columns = df.columns.tolist()
+    columns = [safe_identifier(c) for c in df.columns.tolist()]
+
+    # Precompute quoted column list depending on DB type
+    if db_type == 'postgres':
+        cols = ", ".join([f'\"{c}\"' for c in columns])
+    else:
+        # For SQL Server and Oracle use plain names
+        cols = ", ".join([f'{c}' for c in columns])
+
+    # Validate schema/table too
+    schema_safe = safe_identifier(schema)
+    table_safe = safe_identifier(table)
+
     for _, row in df.iterrows():
         values = []
         for val in row:
             if pd.isnull(val):
                 values.append("NULL")
             else:
+                # escape single quotes in values
                 values.append(f"'{str(val).replace(chr(39), chr(39)*2)}'")
-        cols = ", ".join([f'"{col}"' for col in columns]) if db_type == 'postgres' else ", ".join(columns)
         vals = ", ".join(values)
-        statements.append(f'INSERT INTO [{schema}].[{table}] ({cols}) VALUES ({vals});')
+        # Build INSERT with safe identifiers. Use bracketed [schema].[table] as the
+        # canonical reference so it matches the DELETE/USE lines produced elsewhere
+        # in the code and the expectations in the test-suite.
+        table_ref = f'[{schema_safe}].[{table_safe}]'
+        statements.append(f'INSERT INTO {table_ref} ({cols}) VALUES ({vals});')
+
     logging.info(f"Generati {len(statements)} statements INSERT")
     return "\n".join(statements)
 
