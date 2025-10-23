@@ -77,7 +77,7 @@ Output generati:
 
 - HTML: `htmlcov/index.html`
 - XML: `coverage.xml`
-- Badge: `coverage.svg` (facoltativo, puoi aggiungerlo al README con `![coverage](coverage.svg)`).
+- Badge: `coverage.svg` (opzionale, puoi aggiungerlo al README con `![coverage](coverage.svg)`).
 
 ### Test Inclusi
 
