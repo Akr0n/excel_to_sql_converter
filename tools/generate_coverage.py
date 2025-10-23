@@ -26,7 +26,7 @@ def main() -> int:
         print("Tests failed; coverage may be incomplete.")
 
     # Generate local badge (coverage.svg) in repo root if coverage-badge is installed
-    run([sys.executable, "-m", "coverage_badge", "-o", "coverage.svg", "-f"])
+    badge_code = run([sys.executable, "-m", "coverage_badge", "-o", "coverage.svg", "-f"])
     if badge_code != 0:
         print("Warning: Coverage badge generation failed. Is 'coverage-badge' installed?")
 
