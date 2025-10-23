@@ -12,7 +12,6 @@ import pandas as pd
 import logging
 from unittest.mock import patch, MagicMock
 import sys
-# import pytest  # Optional for now
 
 # Importa le funzioni da testare
 from excel_to_sql_converter import (
@@ -300,6 +299,27 @@ class TestLogging(unittest.TestCase):
             expected_path = os.path.join(self.temp_dir, expected_log)
             
             self.assertEqual(log_file, expected_path)
+
+    def test_setup_logging_closes_previous_handlers(self):
+        """Test that calling setup_logging twice closes previous handlers and leaves only one active handler"""
+        test_file1 = os.path.join(self.temp_dir, "first.csv")
+        test_file2 = os.path.join(self.temp_dir, "second.csv")
+
+        log1 = setup_logging(test_file1)
+        # Capture handlers after first setup
+        handlers_after_first = list(logging.getLogger().handlers)
+        self.assertGreaterEqual(len(handlers_after_first), 1)
+        # Call setup_logging again for a different file
+        log2 = setup_logging(test_file2)
+        handlers_after_second = list(logging.getLogger().handlers)
+
+        # Expect only one handler active (the newly created one)
+        self.assertEqual(len(handlers_after_second), 1)
+        # The active handler should be writing to the second log file
+        active_handler = handlers_after_second[0]
+        # If it's a FileHandler, verify baseFilename matches expected path
+        if hasattr(active_handler, 'baseFilename'):
+            self.assertTrue(active_handler.baseFilename.endswith(os.path.basename(log2)))
 
 
 class TestIntegration(unittest.TestCase):
