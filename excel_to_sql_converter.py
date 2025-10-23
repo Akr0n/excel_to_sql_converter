@@ -72,6 +72,11 @@ def format_insert(db_type, schema, table, df):
         This function rejects identifiers containing dangerous characters (such as quotes,
         semicolons, brackets, slashes, or newlines) and any whitespace. It does not
         explicitly restrict to Unicode letters, digits, or underscores.
+
+        Note:
+            This function does NOT guarantee SQL standard compliance for identifiers.
+            It allows any characters except those explicitly blacklisted above, which may
+            include characters that are invalid in some SQL dialects but are not explicitly checked.
         """
         if not isinstance(name, str) or name.strip() == "":
             raise ValueError("Identifier must be a non-empty string")
