@@ -80,7 +80,7 @@ def format_insert(db_type, schema, table, df):
         if not isinstance(name, str) or name.strip() == "":
             raise ValueError("Identifier must be a non-empty string")
         n = name.strip()
-        # Reject if contains whitespace internal (spaces, tabs) - allow though? we'll reject spaces
+        # Reject identifiers containing any internal whitespace (spaces, tabs, etc.)
         if any(ch.isspace() for ch in n):
             raise ValueError(f"Invalid identifier (contains whitespace): {name}")
         # Reject dangerous punctuation
