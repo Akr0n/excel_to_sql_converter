@@ -69,8 +69,9 @@ def format_insert(db_type, schema, table, df):
     def safe_identifier(name):
         """Return a sanitized identifier string or raise ValueError if invalid.
 
-        This allows Unicode letters/digits/underscore and rejects names containing
-        dangerous characters like quotes, semicolons, brackets, or newlines.
+        This function rejects identifiers containing dangerous characters (such as quotes,
+        semicolons, brackets, slashes, or newlines) and any whitespace. It does not
+        explicitly restrict to Unicode letters, digits, or underscores.
         """
         if not isinstance(name, str) or name.strip() == "":
             raise ValueError("Identifier must be a non-empty string")
