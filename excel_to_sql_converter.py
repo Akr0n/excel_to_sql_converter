@@ -85,9 +85,12 @@ def format_insert(db_type, schema, table, df):
         if any(ch.isspace() for ch in n):
             raise ValueError(f"Invalid identifier (contains whitespace): {name}")
         # Reject dangerous punctuation
-        for ch in ['"', "'", ';', '[', ']', '\\', '/', '\n', '\r']:
+        for ch in ['"', "'", ';', '[', ']', '\\', '/', '\n', '\r', '@', '-', '*', '%', '`']:
             if ch in n:
                 raise ValueError(f"Invalid identifier: {name}")
+        # Reject control characters (ASCII < 32)
+        if any(ord(ch) < 32 for ch in n):
+            raise ValueError(f"Invalid identifier (contains control character): {name}")
         # If passes basic checks, return as-is (we'll quote appropriately when building SQL)
         return n
 
